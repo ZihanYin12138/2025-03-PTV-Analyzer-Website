@@ -1,0 +1,10 @@
+name: ptv_analyzer
+title:
+username: zyyin1
+account: zyyin1
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 15184361
+bundleId: 10753364
+url: https://zyyin1.shinyapps.io/ptv_analyzer/
+version: 1

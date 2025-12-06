@@ -1,0 +1,625 @@
+from,to,freq,mean_freq
+Sunbury,Diggers Rest,74,23.5
+Sunbury,Watergardens,102,23.5
+Diggers Rest,Watergardens,70,24.11111111111111
+Diggers Rest,Keilor Plains,105,24.11111111111111
+Glen Iris,Darling,184,31.941176470588236
+Glen Iris,Syndal,82,31.941176470588236
+Glen Iris,Gardiner,113,31.941176470588236
+Darling,Glen Iris,109,33
+Darling,East Malvern,182,33
+Darling,Flinders Street,88,33
+Darling,Glen Waverley,84,33
+East Malvern,Darling,102,28.42105263157895
+East Malvern,Holmesglen,182,28.42105263157895
+East Malvern,Richmond,82,28.42105263157895
+Holmesglen,East Malvern,100,27.4
+Holmesglen,Jordanville,182,27.4
+Jordanville,Holmesglen,97,31.941176470588236
+Jordanville,Mount Waverley,181,31.941176470588236
+Flagstaff,Melbourne Central,702,26.912280701754387
+Flagstaff,Parliament,234,26.912280701754387
+Flagstaff,Flinders Street,327,26.912280701754387
+Flagstaff,Richmond,147,26.912280701754387
+Flagstaff,Southern Cross,164,26.912280701754387
+Melbourne Central,Flagstaff,243,25.73109243697479
+Melbourne Central,Parliament,745,25.73109243697479
+Melbourne Central,Camberwell,73,25.73109243697479
+Melbourne Central,Flinders Street,356,25.73109243697479
+Melbourne Central,North Richmond,95,25.73109243697479
+Parliament,Melbourne Central,222,24.878048780487806
+Parliament,Camberwell,121,24.878048780487806
+Parliament,Flinders Street,887,24.878048780487806
+Parliament,Richmond,246,24.878048780487806
+Parliament,North Melbourne,122,24.878048780487806
+Parliament,Broadmeadows,66,24.878048780487806
+Belgrave,Tecoma,101,32.611111111111114
+Belgrave,Upwey,116,32.611111111111114
+Tecoma,Belgrave,85,32
+Tecoma,Upwey,101,32
+Tecoma,Upper Ferntree Gully,111,32
+Upwey,Tecoma,88,30.545454545454547
+Upwey,Camberwell,85,30.545454545454547
+Upwey,Upper Ferntree Gully,108,30.545454545454547
+Upwey,Ferntree Gully,95,30.545454545454547
+Upwey,Bayswater,80,30.545454545454547
+Alamein,Ashburton,122,19.125
+Ashburton,Burwood,123,23.666666666666668
+Burwood,Hartwell,123,25.666666666666668
+Hartwell,Burwood,58,23.1
+Hartwell,Willison,111,23.1
+Willison,Hartwell,58,21.09090909090909
+Willison,Riversdale,111,21.09090909090909
+Riversdale,Willison,58,19.75
+Riversdale,Camberwell,112,19.75
+Camberwell,Flinders Street,378,51.62162162162162
+Camberwell,Canterbury,183,51.62162162162162
+Camberwell,Auburn,211,51.62162162162162
+Flinders Street,Parliament,137,49.11602209944751
+Flinders Street,Frankston,173,49.11602209944751
+Flinders Street,Chelsea,181,49.11602209944751
+Flinders Street,Aspendale,224,49.11602209944751
+Flinders Street,Mordialloc,305,49.11602209944751
+Flinders Street,Dandenong,258,49.11602209944751
+Flinders Street,East Camberwell,149,49.11602209944751
+Flinders Street,Richmond,729,49.11602209944751
+Flinders Street,Westall,163,49.11602209944751
+Flinders Street,Dennis,126,49.11602209944751
+Flinders Street,Elsternwick,134,49.11602209944751
+Flinders Street,North Melbourne,155,49.11602209944751
+Flinders Street,Clifton Hill,203,49.11602209944751
+Flinders Street,Jolimont,137,49.11602209944751
+Flinders Street,Newport,185,49.11602209944751
+Flinders Street,Southern Cross,763,49.11602209944751
+Frankston,Kananook,291,46.083333333333336
+Frankston,Carrum,158,46.083333333333336
+Frankston,Chelsea,165,46.083333333333336
+Kananook,Seaford,294,62.76190476190476
+Kananook,Edithvale,164,62.76190476190476
+Seaford,Carrum,299,59.95454545454545
+Seaford,Chelsea,154,59.95454545454545
+Seaford,Aspendale,164,59.95454545454545
+Carrum,Bonbeach,304,58.48148148148148
+Carrum,Edithvale,156,58.48148148148148
+Carrum,Mordialloc,219,58.48148148148148
+Carrum,Cheltenham,174,58.48148148148148
+Bonbeach,Chelsea,304,63.28
+Bonbeach,Mentone,246,63.28
+Bonbeach,Patterson,186,63.28
+Chelsea,Edithvale,304,60.73076923076923
+Chelsea,Mordialloc,156,60.73076923076923
+Chelsea,Cheltenham,246,60.73076923076923
+Chelsea,Highett,208,60.73076923076923
+Edithvale,Aspendale,304,65.75
+Edithvale,Moorabbin,194,65.75
+Edithvale,South Yarra,196,65.75
+Aspendale,Mordialloc,391,71.63636363636364
+Aspendale,Highett,242,71.63636363636364
+Mordialloc,Parkdale,292,66.91304347826087
+Mordialloc,Moorabbin,235,66.91304347826087
+Parkdale,Mentone,146,24.2
+Parkdale,Armadale,90,24.2
+Mentone,Cheltenham,156,52.55
+Mentone,Highett,238,52.55
+Mentone,Richmond,291,52.55
+Cheltenham,Moorabbin,420,51
+Cheltenham,Ormond,169,51
+Upper Ferntree Gully,Ferntree Gully,119,32.22727272727273
+Upper Ferntree Gully,Boronia,111,32.22727272727273
+Upper Ferntree Gully,Bayswater,91,32.22727272727273
+Upper Ferntree Gully,Heathmont,90,32.22727272727273
+Ferntree Gully,Boronia,117,29.708333333333332
+Ferntree Gully,Bayswater,110,29.708333333333332
+Boronia,Bayswater,118,29.833333333333332
+Boronia,Heathmont,110,29.833333333333332
+Boronia,Canterbury,77,29.833333333333332
+Bayswater,East Camberwell,84,27.625
+Heathmont,East Camberwell,68,26.61904761904762
+Heathmont,Canterbury,70,26.61904761904762
+Highett,Richmond,312,53.130434782608695
+Highett,Moorabbin,149,53.130434782608695
+Highett,Bentleigh,265,53.130434782608695
+Highett,Caulfield,188,53.130434782608695
+Glen Waverley,Syndal,133,26.076923076923077
+Syndal,Glen Waverley,172,41.76923076923077
+Syndal,Mount Waverley,153,41.76923076923077
+Mount Waverley,Jordanville,105,34.25
+Mount Waverley,Syndal,163,34.25
+Mount Waverley,Heyington,93,34.25
+Lilydale,Mooroolbark,386,38.111111111111114
+Lilydale,Blackburn,99,38.111111111111114
+Mooroolbark,Croydon,318,41.421052631578945
+Croydon,Ringwood East,129,25.94736842105263
+Ringwood East,Canterbury,106,31.68421052631579
+Ringwood East,Nunawading,83,31.68421052631579
+Pakenham,Beaconsfield,210,50.869565217391305
+Pakenham,Berwick,313,50.869565217391305
+Officer,Beaconsfield,335,62.85
+Officer,Hallam,265,62.85
+Beaconsfield,Berwick,315,59.76190476190476
+Beaconsfield,Dandenong,276,59.76190476190476
+Berwick,Narre Warren,347,68.65
+Berwick,Dandenong,238,68.65
+Berwick,Yarraman,249,68.65
+Narre Warren,Hallam,237,46.04347826086956
+Narre Warren,Yarraman,214,46.04347826086956
+Narre Warren,Noble Park,138,46.04347826086956
+Hallam,Dandenong,237,52.791666666666664
+Hallam,Noble Park,333,52.791666666666664
+Hallam,Sandown Park,148,52.791666666666664
+Cranbourne,Merinda Park,171,39
+Cranbourne,Dandenong,179,39
+Cranbourne,Yarraman,130,39
+Merinda Park,Cranbourne,127,41.75
+Merinda Park,Yarraman,173,41.75
+Merinda Park,Noble Park,141,41.75
+Merinda Park,Lynbrook,145,41.75
+Dandenong,Yarraman,328,78.56666666666666
+Dandenong,Sandown Park,500,78.56666666666666
+Dandenong,Springvale,282,78.56666666666666
+Dandenong,Westall,367,78.56666666666666
+Yarraman,Noble Park,353,70.34482758620689
+Yarraman,Springvale,464,70.34482758620689
+Yarraman,Westall,268,70.34482758620689
+Yarraman,Clayton,206,70.34482758620689
+Noble Park,Sandown Park,394,73.93103448275862
+Noble Park,Westall,484,73.93103448275862
+Noble Park,Clayton,245,73.93103448275862
+Sandown Park,Richmond,329,69.12903225806451
+Sandown Park,Springvale,273,69.12903225806451
+Sandown Park,Clayton,429,69.12903225806451
+Sandown Park,Huntingdale,236,69.12903225806451
+East Camberwell,Canterbury,131,52.333333333333336
+East Camberwell,Chatham,235,52.333333333333336
+East Camberwell,Hawthorn,202,52.333333333333336
+Canterbury,Chatham,134,50.32
+Canterbury,Laburnum,416,50.32
+Canterbury,Nunawading,181,50.32
+Canterbury,Glenferrie,155,50.32
+Chatham,Laburnum,177,50.28
+Chatham,Blackburn,361,50.28
+Chatham,Mitcham,158,50.28
+Chatham,Auburn,136,50.28
+Laburnum,Blackburn,232,46.241379310344826
+Laburnum,Nunawading,163,46.241379310344826
+Laburnum,Mitcham,156,46.241379310344826
+Laburnum,Heatherdale,299,46.241379310344826
+Laburnum,Glenferrie,119,46.241379310344826
+Blackburn,Nunawading,226,55
+Blackburn,Mitcham,183,55
+Blackburn,Heatherdale,187,55
+Blackburn,Ringwood,342,55
+Nunawading,Mitcham,230,42.172413793103445
+Nunawading,Heatherdale,177,42.172413793103445
+Nunawading,Ringwood,179,42.172413793103445
+Nunawading,Glenferrie,165,42.172413793103445
+Mitcham,Heatherdale,241,38.5625
+Mitcham,Ringwood,185,38.5625
+Mitcham,Auburn,156,38.5625
+Mitcham,Box Hill,186,38.5625
+Heatherdale,Ringwood,237,42.10344827586207
+Heatherdale,Union,179,42.10344827586207
+Ringwood,Glenferrie,123,42.84375
+Ringwood,Box Hill,253,42.84375
+Auburn,Camberwell,203,53.03846153846154
+Auburn,Glenferrie,316,53.03846153846154
+Auburn,Hawthorn,212,53.03846153846154
+Auburn,Richmond,238,53.03846153846154
+Auburn,Box Hill,145,53.03846153846154
+Glenferrie,Auburn,134,49.94285714285714
+Glenferrie,Hawthorn,294,49.94285714285714
+Glenferrie,Burnley,328,49.94285714285714
+Glenferrie,Richmond,196,49.94285714285714
+Glenferrie,Union,201,49.94285714285714
+Hawthorn,Camberwell,130,39.8235294117647
+Hawthorn,Glenferrie,136,39.8235294117647
+Hawthorn,Burnley,258,39.8235294117647
+Hawthorn,Richmond,238,39.8235294117647
+Burnley,Hawthorn,158,41.340425531914896
+Burnley,East Richmond,231,41.340425531914896
+Burnley,Richmond,284,41.340425531914896
+Burnley,Heyington,194,41.340425531914896
+Burnley,Box Hill,123,41.340425531914896
+Burnley,Union,126,41.340425531914896
+East Richmond,Darling,53,19.842105263157894
+East Richmond,Jordanville,55,19.842105263157894
+East Richmond,Burnley,195,19.842105263157894
+East Richmond,Richmond,210,19.842105263157894
+East Richmond,Tooronga,53,19.842105263157894
+Richmond,Parliament,253,69.23333333333333
+Richmond,Flinders Street,956,69.23333333333333
+Richmond,Edithvale,211,69.23333333333333
+Richmond,East Richmond,185,69.23333333333333
+Richmond,Springvale,452,69.23333333333333
+Richmond,Clayton,211,69.23333333333333
+Richmond,Huntingdale,234,69.23333333333333
+Richmond,Patterson,179,69.23333333333333
+Richmond,Bentleigh,265,69.23333333333333
+Richmond,South Yarra,321,69.23333333333333
+Richmond,Box Hill,266,69.23333333333333
+Richmond,Southern Cross,397,69.23333333333333
+Heyington,Burnley,101,31.176470588235293
+Heyington,Kooyong,197,31.176470588235293
+Kooyong,Heyington,94,36.06666666666667
+Kooyong,Tooronga,181,36.06666666666667
+Tooronga,Kooyong,94,33.5625
+Tooronga,Gardiner,184,33.5625
+Gardiner,Glen Iris,328,39.42857142857143
+Springvale,Sandown Park,222,76.46428571428571
+Springvale,Westall,330,76.46428571428571
+Springvale,Huntingdale,487,76.46428571428571
+Springvale,Oakleigh,291,76.46428571428571
+Springvale,Hughesdale,219,76.46428571428571
+Westall,Clayton,359,65.70588235294117
+Westall,Oakleigh,478,65.70588235294117
+Westall,Hughesdale,285,65.70588235294117
+Westall,Murrumbeena,215,65.70588235294117
+Clayton,Huntingdale,404,66.25
+Clayton,Hughesdale,348,66.25
+Clayton,Murrumbeena,289,66.25
+Clayton,Carnegie,214,66.25
+Huntingdale,Oakleigh,396,68.09677419354838
+Huntingdale,Murrumbeena,348,68.09677419354838
+Huntingdale,Carnegie,289,68.09677419354838
+Huntingdale,Caulfield,212,68.09677419354838
+Oakleigh,Hughesdale,390,62.14705882352941
+Oakleigh,Carnegie,348,62.14705882352941
+Oakleigh,Caulfield,293,62.14705882352941
+Oakleigh,South Yarra,156,62.14705882352941
+Hughesdale,Murrumbeena,402,59.696969696969695
+Hughesdale,Caulfield,352,59.696969696969695
+Hughesdale,South Yarra,153,59.696969696969695
+Murrumbeena,Carnegie,416,59.75757575757576
+Murrumbeena,South Yarra,351,59.75757575757576
+Carnegie,Caulfield,415,61.5625
+Carnegie,South Yarra,157,61.5625
+Werribee,Hoppers Crossing,146,41.833333333333336
+Werribee,Laverton,122,41.833333333333336
+Hoppers Crossing,Laverton,127,39.92857142857143
+Laverton,Aircraft,149,45.5
+Laverton,Seaholme,140,45.5
+Laverton,Newport,150,45.5
+Aircraft,Altona,118,37.266666666666666
+Aircraft,North Melbourne,99,37.266666666666666
+Westona,Newport,152,31.571428571428573
+Altona,North Melbourne,152,40.18181818181818
+Seaholme,North Melbourne,86,33.92307692307692
+Seaholme,Newport,114,33.92307692307692
+Seaholme,Southern Cross,119,33.92307692307692
+Westgarth,Fairfield,175,37.714285714285715
+Westgarth,Darebin,125,37.714285714285715
+Westgarth,Eaglemont,101,37.714285714285715
+Dennis,Alphington,175,39.6
+Dennis,Ivanhoe,129,39.6
+Dennis,Heidelberg,105,39.6
+Fairfield,Darebin,175,37.76190476190476
+Fairfield,Eaglemont,125,37.76190476190476
+Fairfield,Rosanna,103,37.76190476190476
+Fairfield,North Richmond,101,37.76190476190476
+Alphington,Ivanhoe,179,36.04545454545455
+Alphington,Heidelberg,128,36.04545454545455
+Alphington,Collingwood,110,36.04545454545455
+Darebin,Eaglemont,175,37.857142857142854
+Darebin,Rosanna,127,37.857142857142854
+Darebin,Victoria Park,153,37.857142857142854
+Ivanhoe,Heidelberg,189,38.13636363636363
+Ivanhoe,Clifton Hill,169,38.13636363636363
+Eaglemont,Rosanna,181,36.13636363636363
+Eaglemont,North Richmond,121,36.13636363636363
+Heidelberg,Rosanna,104,37.56
+Heidelberg,Clifton Hill,179,37.56
+Heidelberg,Victoria Park,129,37.56
+Heidelberg,Collingwood,135,37.56
+Rosanna,Clifton Hill,131,32.24
+Rosanna,Victoria Park,151,32.24
+Rosanna,Jolimont,141,32.24
+Moorabbin,Patterson,151,58.875
+Moorabbin,Mckinnon,404,58.875
+Moorabbin,Caulfield,242,58.875
+Moorabbin,Malvern,180,58.875
+Patterson,Ormond,404,63.8
+Patterson,Malvern,177,63.8
+Patterson,Armadale,177,63.8
+Bentleigh,Mckinnon,147,58
+Bentleigh,Glenhuntly,404,58
+Bentleigh,Armadale,178,58
+Bentleigh,Toorak,178,58
+Mckinnon,Caulfield,405,63.85
+Mckinnon,Toorak,187,63.85
+Mckinnon,Hawksburn,177,63.85
+Ormond,Glenhuntly,160,60.80952380952381
+Ormond,Malvern,403,60.80952380952381
+Ormond,Hawksburn,184,60.80952380952381
+Ormond,South Yarra,179,60.80952380952381
+Glenhuntly,Caulfield,175,64.05
+Glenhuntly,Armadale,394,64.05
+Glenhuntly,South Yarra,184,64.05
+Caulfield,Flinders Street,213,69.41818181818182
+Caulfield,Kananook,262,69.41818181818182
+Caulfield,Malvern,415,69.41818181818182
+Caulfield,Toorak,398,69.41818181818182
+Caulfield,South Yarra,335,69.41818181818182
+Caulfield,Southern Cross,176,69.41818181818182
+Malvern,Kananook,182,46.42
+Malvern,Armadale,192,46.42
+Malvern,Hawksburn,415,46.42
+Malvern,South Yarra,242,46.42
+Malvern,Southland,173,46.42
+Armadale,Carrum,248,58.03703703703704
+Armadale,Toorak,171,58.03703703703704
+Armadale,South Yarra,418,58.03703703703704
+Armadale,Southland,238,58.03703703703704
+Toorak,Flinders Street,221,47.484848484848484
+Toorak,Carrum,286,47.484848484848484
+Toorak,Bonbeach,246,47.484848484848484
+Toorak,Hawksburn,175,47.484848484848484
+Toorak,Southland,160,47.484848484848484
+Hawksburn,Kananook,191,47.90625
+Hawksburn,Bonbeach,299,47.90625
+Hawksburn,Chelsea,242,47.90625
+Hawksburn,South Yarra,228,47.90625
+Sandringham,Hampton,118,25.75
+Sandringham,Ripponlea,135,25.75
+Hampton,Sandringham,96,33.25
+Hampton,Brighton Beach,120,33.25
+Hampton,Balaclava,135,33.25
+Brighton Beach,Hampton,89,28.928571428571427
+Brighton Beach,Middle Brighton,119,28.928571428571427
+Brighton Beach,Windsor,136,28.928571428571427
+Middle Brighton,Brighton Beach,93,31.153846153846153
+Middle Brighton,North Brighton,116,31.153846153846153
+Middle Brighton,Prahran,137,31.153846153846153
+North Brighton,Middle Brighton,99,36.54545454545455
+North Brighton,Gardenvale,117,36.54545454545455
+North Brighton,South Yarra,137,36.54545454545455
+Gardenvale,North Brighton,171,33.5
+Gardenvale,Elsternwick,116,33.5
+Elsternwick,Richmond,78,27
+Elsternwick,Gardenvale,103,27
+Ripponlea,Hampton,64,20.76923076923077
+Ripponlea,Elsternwick,101,20.76923076923077
+Ripponlea,Balaclava,60,20.76923076923077
+Balaclava,Sandringham,67,20.76923076923077
+Balaclava,Brighton Beach,63,20.76923076923077
+Balaclava,Windsor,60,20.76923076923077
+Windsor,Hampton,72,22.166666666666668
+Windsor,Middle Brighton,61,22.166666666666668
+Windsor,Prahran,59,22.166666666666668
+Prahran,Brighton Beach,79,20.76923076923077
+Prahran,North Brighton,57,20.76923076923077
+Prahran,South Yarra,61,20.76923076923077
+South Yarra,Flagstaff,277,69.49122807017544
+South Yarra,Flinders Street,254,69.49122807017544
+South Yarra,Seaford,205,69.49122807017544
+South Yarra,Edithvale,247,69.49122807017544
+South Yarra,Noble Park,202,69.49122807017544
+South Yarra,Richmond,782,69.49122807017544
+South Yarra,Southern Cross,264,69.49122807017544
+South Yarra,Southland,311,69.49122807017544
+Upfield,Gowrie,106,18.642857142857142
+Upfield,Batman,59,18.642857142857142
+Gowrie,Fawkner,104,21.142857142857142
+Gowrie,Coburg,59,21.142857142857142
+Fawkner,Merlynston,89,18.625
+Fawkner,Moreland,59,18.625
+Merlynston,Batman,89,19.733333333333334
+Merlynston,Anstey,59,19.733333333333334
+Batman,Coburg,90,18.764705882352942
+Batman,Brunswick,59,18.764705882352942
+Coburg,Moreland,89,19.647058823529413
+Coburg,Jewell,60,19.647058823529413
+Moreland,Anstey,88,18.352941176470587
+Moreland,Royal Park,60,18.352941176470587
+Anstey,Brunswick,86,19.1875
+Anstey,Flemington Bridge,60,19.1875
+Brunswick,Jewell,85,20.466666666666665
+Brunswick,Macaulay,60,20.466666666666665
+Jewell,Royal Park,74,19.25
+Jewell,North Melbourne,60,19.25
+Royal Park,Coburg,51,19.3125
+Royal Park,Jewell,50,19.3125
+Royal Park,Flemington Bridge,74,19.3125
+Flemington Bridge,Moreland,50,18.176470588235293
+Flemington Bridge,Royal Park,56,18.176470588235293
+Flemington Bridge,Macaulay,63,18.176470588235293
+Macaulay,Anstey,51,18.058823529411764
+Macaulay,North Melbourne,62,18.058823529411764
+North Melbourne,Flagstaff,177,42.98275862068966
+North Melbourne,Flinders Street,180,42.98275862068966
+North Melbourne,Seddon,119,42.98275862068966
+North Melbourne,Southern Cross,308,42.98275862068966
+Clifton Hill,Victoria Park,214,46.39473684210526
+Clifton Hill,Collingwood,183,46.39473684210526
+Clifton Hill,North Richmond,116,46.39473684210526
+Clifton Hill,West Richmond,230,46.39473684210526
+Clifton Hill,Macleod,164,46.39473684210526
+Clifton Hill,Epping,118,46.39473684210526
+Clifton Hill,Reservoir,169,46.39473684210526
+Victoria Park,Collingwood,202,37.675
+Victoria Park,North Richmond,179,37.675
+Victoria Park,West Richmond,103,37.675
+Victoria Park,Jolimont,250,37.675
+Victoria Park,Regent,133,37.675
+Collingwood,North Richmond,214,39.16216216216216
+Collingwood,West Richmond,178,39.16216216216216
+Collingwood,Jolimont,114,39.16216216216216
+Collingwood,Greensborough,119,39.16216216216216
+Collingwood,Preston,131,39.16216216216216
+North Richmond,West Richmond,224,36.325
+North Richmond,Jolimont,191,36.325
+North Richmond,Watsonia,136,36.325
+North Richmond,Bell,132,36.325
+West Richmond,Jolimont,240,34.595238095238095
+West Richmond,Macleod,153,34.595238095238095
+West Richmond,Epping,103,34.595238095238095
+Jolimont,Flinders Street,370,41.23076923076923
+Jolimont,Watsonia,109,41.23076923076923
+Jolimont,Montmorency,105,41.23076923076923
+Macleod,Westgarth,110,37.875
+Macleod,Greensborough,217,37.875
+Macleod,Eltham,118,37.875
+Watsonia,Montmorency,178,30.423076923076923
+Watsonia,Eltham,77,30.423076923076923
+Greensborough,Montmorency,106,32.758620689655174
+Greensborough,Eltham,243,32.758620689655174
+Greensborough,Diamond Creek,115,32.758620689655174
+Montmorency,Eltham,102,32.535714285714285
+Montmorency,Diamond Creek,145,32.535714285714285
+Montmorency,Wattle Glen,116,32.535714285714285
+Eltham,Alphington,89,31.517241379310345
+Eltham,Montmorency,101,31.517241379310345
+Eltham,Wattle Glen,142,31.517241379310345
+Eltham,Hurstbridge,118,31.517241379310345
+Diamond Creek,Darebin,81,22.357142857142858
+Diamond Creek,Eltham,107,22.357142857142858
+Diamond Creek,Hurstbridge,124,22.357142857142858
+Wattle Glen,Ivanhoe,79,22
+Wattle Glen,Diamond Creek,79,22
+Wattle Glen,Hurstbridge,89,22
+Hurstbridge,Eaglemont,78,18.037037037037038
+Hurstbridge,Wattle Glen,79,18.037037037037038
+Williamstown,Williamstown Beach,87,20
+Williamstown Beach,Williamstown,85,25.333333333333332
+Williamstown Beach,North Williamstown,100,25.333333333333332
+North Williamstown,Newport,87,28.375
+Newport,Spotswood,214,53.705882352941174
+Spotswood,Yarraville,236,40.93333333333333
+Spotswood,Footscray,132,40.93333333333333
+Yarraville,Seddon,222,34
+Yarraville,South Kensington,114,34
+Seddon,Yarraville,104,34
+Seddon,Footscray,233,34
+Seddon,Southern Cross,100,34
+Watergardens,Diggers Rest,110,40.375
+Watergardens,Keilor Plains,122,40.375
+Watergardens,St Albans,121,40.375
+Keilor Plains,Watergardens,118,38
+Keilor Plains,St Albans,122,38
+Keilor Plains,Ginifer,121,38
+St Albans,Ginifer,112,38.05882352941177
+St Albans,Albion,120,38.05882352941177
+Ginifer,Albion,124,38
+Ginifer,Sunshine,123,38
+Albion,Sunshine,116,37.94117647058823
+Albion,Tottenham,112,37.94117647058823
+Albion,Southern Cross,95,37.94117647058823
+Epping,Lalor,293,42.708333333333336
+Epping,Regent,109,42.708333333333336
+Epping,Thornbury,122,42.708333333333336
+Epping,South Morang,137,42.708333333333336
+Lalor,Thomastown,301,36.34782608695652
+Lalor,Reservoir,104,36.34782608695652
+Lalor,Preston,107,36.34782608695652
+Lalor,Croxton,117,36.34782608695652
+Thomastown,Keon Park,286,35.375
+Thomastown,Regent,104,35.375
+Thomastown,Bell,103,35.375
+Thomastown,Northcote,119,35.375
+Keon Park,Ruthven,117,24.61904761904762
+Keon Park,Preston,112,24.61904761904762
+Keon Park,Thornbury,91,24.61904761904762
+Ruthven,Reservoir,128,28.041666666666668
+Ruthven,Bell,109,28.041666666666668
+Ruthven,Croxton,101,28.041666666666668
+Ruthven,Merri,106,28.041666666666668
+Reservoir,Regent,127,34.666666666666664
+Reservoir,Thornbury,110,34.666666666666664
+Reservoir,Northcote,104,34.666666666666664
+Reservoir,Rushall,106,34.666666666666664
+Reservoir,Mernda,123,34.666666666666664
+Regent,Preston,126,36.31818181818182
+Regent,Croxton,111,36.31818181818182
+Regent,Merri,103,36.31818181818182
+Regent,Hawkstowe,122,36.31818181818182
+Preston,Collingwood,100,34.041666666666664
+Preston,Bell,128,34.041666666666664
+Preston,Northcote,111,34.041666666666664
+Preston,Rushall,108,34.041666666666664
+Preston,Middle Gorge,125,34.041666666666664
+Bell,North Richmond,109,33.333333333333336
+Bell,Thornbury,127,33.333333333333336
+Bell,Merri,111,33.333333333333336
+Bell,South Morang,175,33.333333333333336
+Thornbury,West Richmond,102,33.25
+Thornbury,Croxton,129,33.25
+Thornbury,Rushall,111,33.25
+Croxton,Jolimont,105,31.92
+Croxton,Northcote,129,31.92
+Croxton,Mernda,105,31.92
+Northcote,Flinders Street,95,30.653846153846153
+Northcote,Clifton Hill,86,30.653846153846153
+Northcote,Merri,132,30.653846153846153
+Northcote,Hawkstowe,120,30.653846153846153
+Merri,Rushall,133,31.541666666666668
+Merri,Middle Gorge,123,31.541666666666668
+Rushall,Clifton Hill,254,32.2
+Rushall,Southern Cross,94,32.2
+Rushall,South Morang,87,32.2
+Sunshine,Albion,91,32.89473684210526
+Sunshine,Tottenham,117,32.89473684210526
+Sunshine,West Footscray,113,32.89473684210526
+Tottenham,West Footscray,111,28
+Tottenham,Middle Footscray,106,28
+West Footscray,Middle Footscray,113,28.22222222222222
+West Footscray,Footscray,109,28.22222222222222
+Middle Footscray,Watergardens,79,28.27777777777778
+Middle Footscray,Footscray,128,28.27777777777778
+Footscray,North Melbourne,131,40.03030303030303
+Footscray,South Kensington,249,40.03030303030303
+Footscray,Southern Cross,198,40.03030303030303
+South Kensington,North Melbourne,161,38.4375
+Broadmeadows,Jacana,130,34.76470588235294
+Broadmeadows,Oak Park,152,34.76470588235294
+Broadmeadows,Craigieburn,101,34.76470588235294
+Jacana,Glenroy,127,29.842105263157894
+Jacana,Pascoe Vale,151,29.842105263157894
+Jacana,Roxburgh Park,95,29.842105263157894
+Glenroy,Oak Park,134,31.555555555555557
+Glenroy,Strathmore,151,31.555555555555557
+Oak Park,Pascoe Vale,132,29.894736842105264
+Oak Park,Glenbervie,151,29.894736842105264
+Pascoe Vale,Strathmore,117,29.94736842105263
+Pascoe Vale,Essendon,152,29.94736842105263
+Strathmore,Glenbervie,127,29.68421052631579
+Strathmore,Moonee Ponds,149,29.68421052631579
+Glenbervie,Essendon,121,29.736842105263158
+Glenbervie,Ascot Vale,149,29.736842105263158
+Essendon,Moonee Ponds,124,31.42105263157895
+Essendon,Newmarket,158,31.42105263157895
+Moonee Ponds,Ascot Vale,120,27.35
+Moonee Ponds,Kensington,154,27.35
+Ascot Vale,Essendon,79,28.210526315789473
+Ascot Vale,Newmarket,125,28.210526315789473
+Newmarket,Moonee Ponds,70,26.7
+Newmarket,Kensington,141,26.7
+Kensington,North Melbourne,169,30.22222222222222
+Box Hill,Camberwell,326,47.61764705882353
+Box Hill,Laburnum,125,47.61764705882353
+Box Hill,Union,178,47.61764705882353
+Southern Cross,Flagstaff,996,106.0952380952381
+Southern Cross,Melbourne Central,316,106.0952380952381
+Southern Cross,Flinders Street,1647,106.0952380952381
+Southern Cross,North Melbourne,654,106.0952380952381
+Roxburgh Park,Craigieburn,113,24
+Roxburgh Park,Coolaroo,129,24
+Craigieburn,Flagstaff,57,16.3
+Craigieburn,Roxburgh Park,54,16.3
+Coolaroo,Broadmeadows,147,31.533333333333335
+Coolaroo,Roxburgh Park,89,31.533333333333335
+Lynbrook,Merinda Park,437,92.88888888888889
+Lynbrook,Dandenong,254,92.88888888888889
+Cardinia Road,Pakenham,860,157.25
+South Morang,Epping,158,44.65217391304348
+South Morang,Middle Gorge,357,44.65217391304348
+Southland,Flinders Street,246,87.21428571428571
+Southland,Seaford,266,87.21428571428571
+Middle Gorge,North Richmond,107,41.791666666666664
+Middle Gorge,South Morang,107,41.791666666666664
+Middle Gorge,Hawkstowe,355,41.791666666666664
+Hawkstowe,Mernda,356,45.68181818181818
+Mernda,Victoria Park,151,28.555555555555557
+Mernda,Epping,135,28.555555555555557
+Mernda,Hawkstowe,105,28.555555555555557
+Union,East Camberwell,114,45.58620689655172
+Union,Chatham,310,45.58620689655172
+East Pakenham,Pakenham,110,22.375
