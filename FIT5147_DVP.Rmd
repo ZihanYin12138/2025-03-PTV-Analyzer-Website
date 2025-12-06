@@ -1,0 +1,4326 @@
+---
+title: "FIT5147_DVP"
+author: "Zihan Yin"
+date: '2025-06-03'
+output: html_document
+---
+
+```{r}
+library(tidyverse)
+library(ggforce)
+```
+
+# 读取主数据原版
+```{r}
+col_spec <- cols(
+  Business_Date = col_date(format = ""),
+  Day_of_Week = col_factor(
+    levels = c("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"),
+    ordered = TRUE
+  ),
+  # Day_of_Week = col_character(),
+  Day_Type = col_factor(),
+  # Mode = col_factor(),
+  Train_Number = col_character(),
+  Line_Name = col_factor(),
+  # Group = col_factor(),
+  Direction = col_factor(),
+  Origin_Station = col_factor(),
+  Destination_Station = col_factor(),
+  Station_Name = col_factor(),
+  Station_Latitude = col_double(),
+  Station_Longitude = col_double(),
+  Station_Chainage = col_integer(),
+  Stop_Sequence_Number = col_integer(),
+  Arrival_Time_Scheduled = col_time(format = ""),
+  Departure_Time_Scheduled = col_time(format = ""),
+  Passenger_Boardings = col_integer(),
+  Passenger_Alightings = col_integer(),
+  Passenger_Arrival_Load = col_integer(),
+  Passenger_Departure_Load = col_integer()
+)
+
+Passenger_Dataset <- read_csv(
+  "data/train_service_passenger_counts_fy_2023_2024_edited.csv",
+  col_types = col_spec
+)
+
+# 1. 生成 Time Bin 列
+Passenger_Dataset <- Passenger_Dataset %>%
+  mutate(Arrival_Hour_Scheduled = hour(hms(Arrival_Time_Scheduled))) %>% 
+  mutate(
+    Time_Bin = case_when(
+      Arrival_Hour_Scheduled < 4  ~ "00:00–04:00",
+      Arrival_Hour_Scheduled < 8  ~ "04:00–08:00",
+      Arrival_Hour_Scheduled < 12 ~ "08:00–12:00",
+      Arrival_Hour_Scheduled < 16 ~ "12:00–16:00",
+      Arrival_Hour_Scheduled < 20 ~ "16:00–20:00",
+      TRUE                        ~ "20:00–00:00"
+    ),
+    Day_Type = case_when(
+      Day_Type %in% c("Saturday", "Sunday") ~ "Normal Weekend",
+      TRUE ~ Day_Type
+    )
+  ) %>% 
+  mutate(
+    Day_Type = factor(Day_Type, levels = c(
+      "Normal Weekday", "Normal Weekend", "Public Holiday", "School Holiday")),
+  )
+
+Passenger_Dataset
+```
+
+# 读取主数据新版
+```{r}
+library(tidyverse)
+library(lubridate)
+
+# Step 1: 指定 column specification，全部按字符读取有问题的列
+col_spec <- cols(
+  Business_Date = col_date(format = ""),
+  Day_of_Week = col_character(),
+  Day_Type = col_character(),
+  Train_Number = col_character(),
+  Line_Name = col_character(),
+  Direction = col_character(),
+  Origin_Station = col_character(),
+  Destination_Station = col_character(),
+  Station_Name = col_character(),
+  Station_Latitude = col_double(),
+  Station_Longitude = col_double(),
+  Station_Chainage = col_integer(),
+  Stop_Sequence_Number = col_integer(),
+  Arrival_Time_Scheduled = col_time(format = ""),
+  Departure_Time_Scheduled = col_time(format = ""),
+  Passenger_Boardings = col_integer(),
+  Passenger_Alightings = col_integer(),
+  Passenger_Arrival_Load = col_integer(),
+  Passenger_Departure_Load = col_integer()
+)
+
+# Step 2: 读取数据
+Passenger_Dataset <- read_csv(
+  "data/train_service_passenger_counts_fy_2023_2024_edited.csv",
+  col_types = col_spec
+)
+
+# Step 3: 清洗和转换为因子
+Passenger_Dataset <- Passenger_Dataset %>%
+  mutate(
+    Day_of_Week = factor(Day_of_Week,
+                         levels = c("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"),
+                         ordered = TRUE),
+    Day_Type = case_when(
+      Day_Type %in% c("Saturday", "Sunday") ~ "Normal Weekend",
+      TRUE ~ Day_Type
+    ),
+    Day_Type = factor(Day_Type, levels = c(
+      "Normal Weekday", "Normal Weekend", "Public Holiday", "School Holiday")),
+    Line_Name = as.factor(Line_Name),
+    Direction = as.factor(Direction),
+    Origin_Station = as.factor(Origin_Station),
+    Destination_Station = as.factor(Destination_Station),
+    Station_Name = as.factor(Station_Name),
+    
+    # Step 4: 生成 Time_Bin
+    Arrival_Hour_Scheduled = hour(hms(Arrival_Time_Scheduled)),
+    Time_Bin = case_when(
+      Arrival_Hour_Scheduled < 4  ~ "00:00–04:00",
+      Arrival_Hour_Scheduled < 8  ~ "04:00–08:00",
+      Arrival_Hour_Scheduled < 12 ~ "08:00–12:00",
+      Arrival_Hour_Scheduled < 16 ~ "12:00–16:00",
+      Arrival_Hour_Scheduled < 20 ~ "16:00–20:00",
+      TRUE                        ~ "20:00–00:00"
+    )
+  )
+
+# Step 5: 保存为 RDS 文件（压缩）
+saveRDS(Passenger_Dataset, file = "data/train_service_passenger_counts_fy_2023_2024_edited.rds")
+
+Passenger_Dataset
+
+```
+
+
+# Page 1
+
+## Page 1.1
+###原图
+####导入数据
+
+```{r}
+Passenger_Dataset <- readRDS("data/train_service_passenger_counts_fy_2023_2024_edited.rds")
+Passenger_Dataset
+```
+
+
+####数据预处理
+```{r}
+library(scales)
+
+# 1. 计算方向数据
+df_line_boarding_by_direction <- Passenger_Dataset %>%
+  group_by(Line_Name, Direction) %>%
+  summarise(Total_Boardings = sum(Passenger_Boardings, na.rm = TRUE), .groups = "drop") %>%
+  pivot_wider(names_from = Direction, values_from = Total_Boardings) %>%
+  rename(Down = D, Up = U) %>%
+  rowwise() %>%
+  mutate(sum_load = sum(c(Up, Down), na.rm = TRUE)) %>%
+  arrange(sum_load) %>%
+  mutate(Line_Name = factor(Line_Name, levels = Line_Name)) %>%
+  ungroup()
+
+# 2. 转为长格式
+df_long <- df_line_boarding_by_direction %>%
+  pivot_longer(cols = c("Up", "Down"), names_to = "Direction", values_to = "Boardings") %>%
+  mutate(Direction_Label = if_else(Direction == "Up", "Towards Flinders", "From Flinders"),
+         Color = if_else(Direction == "Up", rgb(0.2, 0.7, 0.1, 0.6), rgb(0.7, 0.2, 0.1, 0.6)))
+
+# 3. 判断右侧点用于标注 sum_load
+# sum_load 标签
+df_sum_labels <- df_line_boarding_by_direction %>%
+  mutate(max_val = pmax(Up, Down),
+         label_x = max_val + 250000,
+         label_y = Line_Name,
+         label_text = label_number(accuracy = 0.1, scale_cut = cut_short_scale())(sum_load))
+
+```
+
+####制图
+
+```{r}
+# 4. 绘图
+ggplot() +
+  # 连线
+  geom_segment(data = df_line_boarding_by_direction,
+               aes(x = Line_Name, xend = Line_Name, y = Down, yend = Up),
+               color = "grey") +
+  # 方向点
+  geom_point(data = df_long,
+             aes(x = Line_Name, y = Boardings, color = Direction_Label),
+             size = 3, shape = 16) +
+  # sum_load 标签
+  geom_text(data = df_sum_labels,
+            aes(x = label_y, y = label_x, label = label_text),
+            color = "grey", size = 3.2, hjust = 0) +
+  # 配置图例颜色
+  scale_color_manual(
+    values = c("Towards Flinders" = rgb(0.2, 0.7, 0.1, 0.6),
+               "From Flinders" = rgb(0.7, 0.2, 0.1, 0.6)),
+    name = "Train Line Direction",
+    guide = guide_legend(override.aes = list(shape = 16, size = 4))
+  ) +
+  coord_flip() +
+  scale_y_continuous(
+    labels = label_number(accuracy = 0.1, scale_cut = cut_short_scale()),
+    limits = c(NA, max(df_sum_labels$label_x) * 1.05)  # 👈 仅设置上限，NA 保持原来的最小值
+  ) +
+  theme_minimal(base_family = "serif") +
+  labs(
+    title = "Train Line Passengers Boarding: Towards vs From Flinders",
+    x = "Train Line",
+    y = "Total Number of Passengers Boarding"
+  ) +
+  theme(
+    legend.position = "right",
+    plot.title = element_text(size = 14, face = "bold"),
+    axis.text.y = element_text(size = 10)
+  ) 
+```
+
+####Story Mode
+
+#####数据预处理
+
+```{r}
+# 加载所需库
+library(tidyverse)
+library(scales)
+
+# 1. 汇总线路各方向的载客量
+df_boarding_by_line_direction <- Passenger_Dataset %>%
+  group_by(Line_Name, Direction) %>%
+  summarise(Total_Boardings = sum(Passenger_Boardings, na.rm = TRUE), .groups = "drop") %>%
+  pivot_wider(names_from = Direction, values_from = Total_Boardings) %>%
+  rename(Down = D, Up = U) %>%
+  rowwise() %>%
+  mutate(sum_load = sum(c(Up, Down), na.rm = TRUE)) %>%
+  arrange(sum_load) %>%
+  mutate(Line_Name = factor(Line_Name, levels = Line_Name)) %>%
+  ungroup()
+
+# 4. 保存为 RDS 文件供 shiny 使用
+saveRDS(
+  df_boarding_by_line_direction, 
+  "data/page_1.1_story_mode.rds"
+)
+```
+
+#####制图
+
+```{r}
+df_boarding_by_line_direction <- readRDS("data/page_1.1_story_mode.rds")
+
+df_boarding_long <- df_boarding_by_line_direction %>%
+  pivot_longer(cols = c("Up", "Down"), names_to = "Direction", values_to = "Boardings") %>%
+  mutate(
+    Direction_Label = if_else(Direction == "Up", "Towards Flinders", "From Flinders"),
+    Color = if_else(Direction == "Up", rgb(0.2, 0.7, 0.1, 0.6), rgb(0.7, 0.2, 0.1, 0.6))
+  )
+
+df_boarding_labels <- df_boarding_by_line_direction %>%
+  mutate(
+    max_val = pmax(Up, Down),
+    label_x = max_val + 250000,
+    label_y = Line_Name,
+    label_text = label_number(accuracy = 0.1, scale_cut = cut_short_scale())(sum_load)
+  )
+
+ggplot() +
+  # 连线
+  geom_segment(data = df_boarding_by_line_direction,
+               aes(x = Line_Name, xend = Line_Name, y = Down, yend = Up),
+               color = "grey40") +
+  # 方向点
+  geom_point(data = df_boarding_long,
+             aes(x = Line_Name, y = Boardings, color = Direction_Label),
+             size = 7, shape = 16) +
+  # sum_load 标签
+  geom_text(data = df_boarding_labels,
+            aes(x = label_y, y = label_x, label = label_text),
+            color = "grey40", size = 5, hjust = 0) +
+  # 配置图例颜色
+  scale_color_manual(
+    values = c("Towards Flinders" = rgb(0.2, 0.7, 0.1, 0.6),
+               "From Flinders" = rgb(0.7, 0.2, 0.1, 0.6)),
+    name = "Train Line Direction",
+    guide = guide_legend(override.aes = list(shape = 16, size = 8))
+  ) +
+  coord_flip() +
+  scale_y_continuous(
+    labels = label_number(accuracy = 0.1, scale_cut = cut_short_scale()),
+    limits = c(NA, max(df_sum_labels$label_x) * 1.05)  # 👈 仅设置上限，NA 保持原来的最小值
+  ) +
+  labs(
+    title = "Train Line Passengers Boarding: Towards vs From Flinders",
+    x = "Train Line",
+    y = "Total Number of Passengers Boarding"
+  ) +
+  theme_minimal(base_family = "roboto") +
+  theme(
+    plot.title = element_text(size = 17, face = "bold", color = "#2a475e"),
+    axis.title = element_text(size = 13, face = "bold"),
+    legend.title = element_text(size = 13, face = "bold"),
+    legend.text = element_text(size = 12),
+    legend.position = "top",
+    axis.text.x = element_text(size = 12),
+    axis.text.y = element_text(size = 12)
+  ) 
+```
+
+
+####Exploration Mode
+
+##### 数据预处理
+
+```{r}
+library(tidyverse)
+library(lubridate)
+
+# 加载数据
+Passenger_Dataset <- readRDS("data/train_service_passenger_counts_fy_2023_2024_edited.rds")
+
+# # Step 1: 添加时间段变量 Time_Bin
+Passenger_Dataset <- Passenger_Dataset %>%
+  mutate(
+    Time_Bin = case_when(
+      hour(Arrival_Time_Scheduled) >= 0  & hour(Arrival_Time_Scheduled) < 4  ~ "00:00-04:00",
+      hour(Arrival_Time_Scheduled) >= 4  & hour(Arrival_Time_Scheduled) < 8  ~ "04:00-08:00",
+      hour(Arrival_Time_Scheduled) >= 8  & hour(Arrival_Time_Scheduled) < 12 ~ "08:00-12:00",
+      hour(Arrival_Time_Scheduled) >= 12 & hour(Arrival_Time_Scheduled) < 16 ~ "12:00-16:00",
+      hour(Arrival_Time_Scheduled) >= 16 & hour(Arrival_Time_Scheduled) < 20 ~ "16:00-20:00",
+      hour(Arrival_Time_Scheduled) >= 20 & hour(Arrival_Time_Scheduled) < 24 ~ "20:00-00:00"
+    ),
+    Day_Type = case_when(
+      Day_Type %in% c("Saturday", "Sunday") ~ "Normal Weekend",
+      TRUE ~ Day_Type
+    )
+  )
+
+# Step 2: 汇总每条线路、方向、Day Type、Time Bin 的载客量
+df_grouped <- Passenger_Dataset %>%
+  group_by(Line_Name, Direction, Day_Type, Time_Bin) %>%
+  summarise(Total_Boardings = sum(Passenger_Boardings, na.rm = TRUE), .groups = "drop")
+
+# Step 3: reshape 成 Up / Down 两列
+df_wide <- df_grouped %>%
+  pivot_wider(names_from = Direction, values_from = Total_Boardings) %>%
+  rename(Down = D, Up = U) %>%
+  mutate(
+    sum_load = Up + Down,
+    diff_load = Up - Down
+  )
+
+# Step 4: 填补缺失组合（例如有些线路在某个时间段某个方向没有数据）
+df_complete <- df_wide %>%
+  complete(Line_Name, Day_Type, Time_Bin, fill = list(Up = 0, Down = 0, sum_load = 0, diff_load = 0))
+
+saveRDS(df_complete, "data/page_1.1_exploration_mode.rds")
+df_complete
+summary(df_complete)
+```
+
+
+#####测试制图
+
+```{r}
+# 假设控件值如下（后续可替换为 Shiny 输入 input$xxx）
+selected_daytype <- "All"
+selected_timebin <- "All"
+sort_by_diff <- TRUE  # TRUE 表示勾选，FALSE 表示未勾选
+
+# 读取数据
+df_exploration_input <- readRDS("data/page_1.1_exploration_mode.rds")
+
+# 过滤
+df_exploration_filtered <- df_exploration_input %>%
+  filter(
+    (selected_daytype == "All" | Day_Type == selected_daytype),
+    (selected_timebin == "All" | Time_Bin == selected_timebin)
+  )
+
+# 判断是否需要聚合
+if (selected_daytype == "All" | selected_timebin == "All") {
+  df_exploration_filtered <- df_exploration_filtered %>%
+    group_by(Line_Name) %>%
+    summarise(
+      Up = sum(Up),
+      Down = sum(Down),
+      sum_load = sum(sum_load),
+      diff_load = sum(diff_load),
+      .groups = "drop"
+    )
+}
+
+# 排序与标签
+if (sort_by_diff) {
+  df_exploration_filtered <- df_exploration_filtered %>%
+    arrange(desc(-diff_load)) %>%
+    mutate(
+      Line_Name = factor(Line_Name, levels = Line_Name),
+      label_value = diff_load,
+      label_text = label_number(accuracy = 0.1, scale_cut = cut_si(""))(diff_load)
+    )
+} else {
+  df_exploration_filtered <- df_exploration_filtered %>%
+    arrange(desc(-sum_load)) %>%
+    mutate(
+      Line_Name = factor(Line_Name, levels = Line_Name),
+      label_value = sum_load,
+      label_text = label_number(accuracy = 0.1, scale_cut = cut_si(""))(sum_load)
+    )
+}
+
+# 长格式供 ggplot 使用
+df_exploration_long <- df_exploration_filtered %>%
+  select(Line_Name, Up, Down) %>%
+  pivot_longer(cols = c(Up, Down), names_to = "Direction", values_to = "Boardings") %>%
+  mutate(
+    Direction_Label = if_else(Direction == "Up", "Towards Flinders", "From Flinders"),
+    Color = if_else(Direction == "Up", rgb(0.2, 0.7, 0.1, 0.6), rgb(0.7, 0.2, 0.1, 0.6))
+  )
+
+# 动态标题
+plot_title_exploration <- paste0(
+  "Train Line Passengers Boarding (",
+  ifelse(selected_daytype == "All", "All Day Types", selected_daytype),
+  ", ",
+  ifelse(selected_timebin == "All", "All Time Periods", selected_timebin),
+  ifelse(sort_by_diff, ", Sorted by Directional Difference", ", Sorted by Total Boardings"),
+  ")"
+)
+
+# 绘图
+ggplot() +
+  geom_segment(data = df_exploration_filtered,
+               aes(x = Line_Name, xend = Line_Name, y = Down, yend = Up),
+               color = "grey") +
+  geom_point(data = df_exploration_long,
+             aes(x = Line_Name, y = Boardings, color = Direction_Label),
+             size = 3, shape = 16) +
+  geom_text(data = df_exploration_filtered,
+            aes(x = Line_Name, y = pmax(Up, Down) + 250000, label = label_text),
+            color = "grey", size = 3.2, hjust = 0) +
+  scale_color_manual(
+    values = c("Towards Flinders" = rgb(0.2, 0.7, 0.1, 0.6),
+               "From Flinders" = rgb(0.7, 0.2, 0.1, 0.6)),
+    name = "Train Line Direction",
+    guide = guide_legend(override.aes = list(shape = 16, size = 4))
+  ) +
+  coord_flip() +
+  scale_y_continuous(
+    labels = label_number(accuracy = 0.1, scale_cut = cut_si("")),
+    limits = c(NA, max(pmax(df_exploration_filtered$Up, df_exploration_filtered$Down) + 250000) * 1.05)
+  ) +
+  labs(
+    title = plot_title_exploration,
+    x = "Train Line",
+    y = "Number of Passengers"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(size = 17, face = "bold", color = "#2a475e"),
+    axis.title = element_text(size = 13, face = "bold"),
+    legend.title = element_text(size = 13, face = "bold"),
+    legend.text = element_text(size = 12),
+    legend.position = "top",
+    axis.text.x = element_text(size = 12),
+    axis.text.y = element_text(size = 12)
+  )
+
+```
+
+```{r}
+df <- readRDS("data/page_1.1_exploration_mode.rds")
+df %>% count(Day_Type)
+df %>% count(Time_Bin)
+```
+
+
+```{r}
+df <- readRDS("data/page_1.1_exploration_mode.rds")
+table(df$Day_Type)
+table(df$Time_Bin)
+
+```
+
+
+
+## Page 1.2
+###原图
+
+####导入数据
+
+主数据
+```{r}
+Passenger_Dataset <- readRDS("data/train_service_passenger_counts_fy_2023_2024_edited.rds")
+Passenger_Dataset
+```
+
+####数据预处理
+
+```{r}
+# 这一段来自DEP Figure 1
+df_line_boarding_by_direction <- Passenger_Dataset %>%
+  group_by(Line_Name, Direction) %>%
+  summarise(Total_Boardings = sum(Passenger_Boardings, na.rm = TRUE), .groups = "drop") %>%
+  pivot_wider(names_from = Direction, values_from = Total_Boardings) %>%
+  rename(Down = D, Up = U) %>%
+  rowwise() %>%
+  mutate(sum_load = sum(c(Up, Down), na.rm = TRUE)) %>%
+  arrange(sum_load) %>%
+  mutate(Line_Name = factor(Line_Name, levels = Line_Name)) %>%
+  ungroup()
+
+# 1. 线路排序（从已有 summary 表中提取）
+sorted_lines <- df_line_boarding_by_direction %>%
+  arrange(sum_load) %>%
+  pull(Line_Name)
+
+# 2. 整理绘图数据：合并两层数据，加一列 Metric
+df_combined <- Passenger_Dataset %>%
+  mutate(Line_Name = factor(Line_Name, levels = sorted_lines),
+         Metric = "Train Frequency Density") %>%
+  select(Arrival_Time_Scheduled, Line_Name, Passenger_Boardings, Metric) %>%
+  bind_rows(
+    Passenger_Dataset %>%
+      mutate(Line_Name = factor(Line_Name, levels = sorted_lines),
+             Metric = "Passenger Boarding Density") %>%
+      select(Arrival_Time_Scheduled, Line_Name, Passenger_Boardings, Metric)
+  )
+
+df_combined
+```
+
+####制图
+
+```{r}
+library(ggridges)
+
+# 3. 绘图（注意设置 fill = Metric）
+ggplot(df_combined, aes(x = Arrival_Time_Scheduled, y = Line_Name, fill = Metric, colour = Metric)) +
+  geom_density_ridges(
+    aes(
+      height = ..density..,
+      weight = ifelse(Metric == "Passenger Boarding Density", Passenger_Boardings, 1),
+      group = interaction(Line_Name, Metric)
+    ),
+    alpha = 0.3,
+    scale = 1,
+    stat = "density"
+  ) +
+  # 手动设置颜色
+  scale_fill_manual(
+    name = "Metric",
+    values = c("Train Frequency Density" = "steelblue", "Passenger Boarding Density" = "darkorange")
+  ) +
+  # 设置时间轴刻度（每4小时一个tick）
+  scale_x_time(
+    labels = scales::label_time(format = "%H:%M"),
+    breaks = hms::hms(hours = seq(0, 24, by = 4))
+  ) +
+  labs(
+    title = "Train Frequency & Boardings by Time of Day",
+    x = "Time of Day",
+    y = "Train Line"
+  ) +
+  theme_minimal(base_family = "serif") +
+  theme(
+    plot.title = element_text(size = 14, face = "bold"),
+    legend.position = "top",
+    axis.text.y = element_text(size = 8, angle = 45, hjust = 1, vjust = -2.5),
+    legend.text = element_text(size = 10),  # 图例文字大小
+    legend.title = element_text(size = 10), # 图例标题大小
+  )
+
+ggsave("plot/figure_12_original.png", width = 6, height = 8, bg = "white")
+```
+
+### 原图快速版本1 (失败)
+#### 数据预处理
+```{r}
+library(dplyr)
+library(lubridate)
+
+# # 添加10分钟时间段列
+# df_combined_binned <- df_combined %>%
+#   mutate(Time_Bin = floor_date(Arrival_Time_Scheduled, unit = "10 minutes"))
+
+# 将 hms 转换为 POSIXct 占位时间（用于聚合）
+df_combined_binned <- df_combined %>%
+  mutate(Time_POSIX = as.POSIXct(Arrival_Time_Scheduled, origin = "1970-01-01"),
+         Time_Bin = floor_date(Time_POSIX, unit = "10 minutes"))
+
+# 分别处理两个 Metric
+df_freq <- df_combined_binned %>%
+  filter(Metric == "Train Frequency Density") %>%
+  group_by(Line_Name, Time_Bin, Metric) %>%
+  summarise(
+    Value = n(),  # 火车数量
+    .groups = "drop"
+  )
+
+df_board <- df_combined_binned %>%
+  filter(Metric == "Passenger Boarding Density") %>%
+  group_by(Line_Name, Time_Bin, Metric) %>%
+  summarise(
+    Value = sum(Passenger_Boardings, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+# 合并两个结果
+df_combined_agg <- bind_rows(df_freq, df_board)
+
+# 检查结构
+df_combined_agg 
+```
+
+####制图
+
+```{r}
+library(ggridges)
+
+# 3. 绘图（注意设置 fill = Metric）
+ggplot(df_combined_agg, aes(x = Time_Bin, y = Line_Name, fill = Metric, colour = Metric)) +
+  geom_density_ridges(
+    aes(
+      height = ..density..,
+      weight = ifelse(Metric == "Passenger Boarding Density", Value, Value),
+      group = interaction(Line_Name, Metric)
+    ),
+    alpha = 0.3,
+    scale = 1,
+    stat = "density"
+  ) +
+
+  # 手动设置颜色
+  scale_fill_manual(
+    name = "Metric",
+    values = c("Train Frequency Density" = "steelblue", "Passenger Boarding Density" = "darkorange")
+  ) +
+  # 设置时间轴刻度（每4小时一个tick）
+  scale_x_time(
+    labels = scales::label_time(format = "%H:%M"),
+    breaks = hms::hms(hours = seq(0, 24, by = 4))
+  ) +
+  labs(
+    title = "Train Frequency & Boardings by Time of Day",
+    x = "Time of Day",
+    y = "Train Line"
+  ) +
+  theme_minimal(base_family = "serif") +
+  theme(
+    plot.title = element_text(size = 14, face = "bold"),
+    legend.position = "top",
+    axis.text.y = element_text(size = 8, angle = 45, hjust = 1, vjust = -2.5),
+    legend.text = element_text(size = 10),  # 图例文字大小
+    legend.title = element_text(size = 10), # 图例标题大小
+  )
+
+ggsave("plot/figure_12_fast1.png", width = 6, height = 8, bg = "white")
+```
+
+### 原图快速版本2 (采纳)
+
+#### 数据预处理
+
+```{r}
+set.seed(5147)  # 设置随机种子以保证可复现
+
+df_combined_sampled <- df_combined %>%
+  group_by(Line_Name, Metric) %>%
+  sample_frac(0.05) %>%
+  ungroup()
+
+saveRDS(df_combined_sampled, file = "data/page_1.2_story_mode.rds")
+df_combined_sampled
+```
+
+
+#### 制图
+
+```{r}
+library(ggridges)
+
+# 3. 绘图（注意设置 fill = Metric）
+ggplot(df_combined_sampled, aes(x = Arrival_Time_Scheduled, y = Line_Name, fill = Metric, colour = Metric)) +
+  geom_density_ridges(
+    aes(
+      height = ..density..,
+      weight = ifelse(Metric == "Passenger Boarding Density", Passenger_Boardings, 1),
+      group = interaction(Line_Name, Metric)
+    ),
+    alpha = 0.3,
+    scale = 1,
+    stat = "density"
+  ) +
+  # 手动设置颜色
+  scale_fill_manual(
+    name = "Metric",
+    values = c("Train Frequency Density" = "steelblue", "Passenger Boarding Density" = "darkorange")
+  ) +
+  # 设置时间轴刻度（每4小时一个tick）
+  scale_x_time(
+    labels = scales::label_time(format = "%H:%M"),
+    breaks = hms::hms(hours = seq(0, 24, by = 4))
+  ) +
+  labs(
+    title = "Train Frequency & Boardings by Time of Day",
+    x = "Time of Day",
+    y = "Train Line"
+  ) +
+  theme_minimal(base_family = "serif") +
+  theme(
+    plot.title = element_text(size = 14, face = "bold"),
+    legend.position = "top",
+    axis.text.y = element_text(size = 8, angle = 45, hjust = 1, vjust = -2.5),
+    legend.text = element_text(size = 10),  # 图例文字大小
+    legend.title = element_text(size = 10), # 图例标题大小
+  )
+
+# ggsave("plot/figure_12_fast2.png", width = 6, height = 8, bg = "white")
+```
+
+### Story Mode
+
+#### Story 1
+
+```{r}
+df_combined_sampled <- readRDS("data/page_1.2_story_mode.rds")
+
+target_lines <- c("Pakenham", "Lilydale", "Craigieburn")
+
+df_story1 <- df_combined_sampled %>%
+  filter(Line_Name %in% target_lines, Metric == "Passenger Boarding Density")
+
+ggplot(df_story1, aes(x = Arrival_Time_Scheduled, y = Line_Name, fill = Metric, colour = Metric)) +
+  geom_density_ridges(
+    aes(
+      height = ..density..,
+      weight = Passenger_Boardings,
+      group = interaction(Line_Name, Metric)
+    ),
+    alpha = 0.4,
+    scale = 1.2,
+    stat = "density"
+  ) +
+  scale_fill_manual(values = c("Passenger Boarding Density" = "darkorange")) +
+  scale_colour_manual(values = c("Passenger Boarding Density" = "darkorange")) +
+  scale_x_time(
+    labels = scales::label_time(format = "%H:%M"),
+    breaks = hms::hms(hours = seq(0, 24, by = 4))
+  ) +
+  labs(
+    title = "Passenger Boarding Density by Time (Top 3 Lines)",
+    x = "Time of Day",
+    y = "Train Line"
+  ) +
+  theme_minimal(base_family = "serif") +
+  theme(
+    plot.title = element_text(size = 14, face = "bold"),
+    legend.position = "none",
+    axis.text.y = element_text(size = 10, face = "bold")
+  )
+
+```
+
+
+#### Story 2
+
+```{r}
+df_story2 <- df_combined_sampled %>%
+  filter(Line_Name %in% target_lines, Metric == "Train Frequency Density")
+
+ggplot(df_story2, aes(x = Arrival_Time_Scheduled, y = Line_Name, fill = Metric, colour = Metric)) +
+  geom_density_ridges(
+    aes(
+      height = ..density..,
+      weight = 1,  # 每行代表一趟车
+      group = interaction(Line_Name, Metric)
+    ),
+    alpha = 0.4,
+    scale = 1.2,
+    stat = "density"
+  ) +
+  scale_fill_manual(values = c("Train Frequency Density" = "steelblue")) +
+  scale_colour_manual(values = c("Train Frequency Density" = "steelblue")) +
+  scale_x_time(
+    labels = scales::label_time(format = "%H:%M"),
+    breaks = hms::hms(hours = seq(0, 24, by = 4))
+  ) +
+  labs(
+    title = "Train Frequency Density by Time (Top 3 Lines)",
+    x = "Time of Day",
+    y = "Train Line"
+  ) +
+  theme_minimal(base_family = "serif") +
+  theme(
+    plot.title = element_text(size = 14, face = "bold"),
+    legend.position = "none",
+    axis.text.y = element_text(size = 10, face = "bold")
+  )
+
+```
+
+
+#### Story 3
+
+```{r}
+target_lines <- c("Pakenham", "Lilydale", "Craigieburn")
+
+df_story3 <- df_combined_sampled %>%
+  filter(Line_Name %in% target_lines)
+
+ggplot(df_story3, aes(x = Arrival_Time_Scheduled, y = Line_Name, fill = Metric, colour = Metric)) +
+  geom_density_ridges(
+    aes(
+      height = ..density..,
+      weight = ifelse(Metric == "Passenger Boarding Density", Passenger_Boardings, 1),
+      group = interaction(Line_Name, Metric)
+    ),
+    alpha = 0.3,
+    scale = 1,
+    stat = "density"
+  ) +
+  scale_fill_manual(
+    values = c("Train Frequency Density" = "steelblue", "Passenger Boarding Density" = "darkorange")
+  ) +
+  scale_colour_manual(
+    values = c("Train Frequency Density" = "steelblue", "Passenger Boarding Density" = "darkorange")
+  ) +
+  scale_x_time(
+    labels = scales::label_time(format = "%H:%M"),
+    breaks = hms::hms(hours = seq(0, 24, by = 4))
+  ) +
+  labs(
+    title = "Supply vs Demand - Top 3 Lines",
+    x = "Time of Day",
+    y = "Train Line"
+  ) +
+  theme_minimal(base_family = "serif") +
+  theme(
+    plot.title = element_text(size = 14, face = "bold"),
+    legend.position = "top",
+    axis.text.y = element_text(size = 10, face = "bold")
+  )
+
+```
+
+#### Story 4
+
+```{r}
+target_lines_4 <- c("Alamein", "Richmond and City Loop")
+
+df_story4 <- df_combined_sampled %>%
+  filter(Line_Name %in% target_lines_4)
+
+ggplot(df_story4, aes(x = Arrival_Time_Scheduled, y = Line_Name, fill = Metric, colour = Metric)) +
+  geom_density_ridges(
+    aes(
+      height = ..density..,
+      weight = ifelse(Metric == "Passenger Boarding Density", Passenger_Boardings, 1),
+      group = interaction(Line_Name, Metric)
+    ),
+    alpha = 0.3,
+    scale = 1,
+    stat = "density"
+  ) +
+  scale_fill_manual(
+    values = c("Train Frequency Density" = "steelblue", "Passenger Boarding Density" = "darkorange")
+  ) +
+  scale_colour_manual(
+    values = c("Train Frequency Density" = "steelblue", "Passenger Boarding Density" = "darkorange")
+  ) +
+  scale_x_time(
+    labels = scales::label_time(format = "%H:%M"),
+    breaks = hms::hms(hours = seq(0, 24, by = 4))
+  ) +
+  labs(
+    title = "Supply vs Demand - Anomalous Lines",
+    x = "Time of Day",
+    y = "Train Line"
+  ) +
+  theme_minimal(base_family = "serif") +
+  theme(
+    plot.title = element_text(size = 14, face = "bold"),
+    legend.position = "top",
+    axis.text.y = element_text(size = 10, face = "bold")
+  )
+
+```
+
+###Exploration Mode
+
+####数据预处理
+```{r}
+library(dplyr)
+library(readr)
+
+# 假设数据集是这个，已经加载完毕：
+# Passenger_Dataset <- readRDS("data/train_service_passenger_counts_fy_2023_2024_edited.rds")
+
+# 确保排序逻辑一致
+df_line_boarding_by_direction <- Passenger_Dataset %>%
+  group_by(Line_Name, Direction) %>%
+  summarise(Total_Boardings = sum(Passenger_Boardings, na.rm = TRUE), .groups = "drop") %>%
+  pivot_wider(names_from = Direction, values_from = Total_Boardings) %>%
+  rename(Down = D, Up = U) %>%
+  rowwise() %>%
+  mutate(sum_load = sum(c(Up, Down), na.rm = TRUE)) %>%
+  arrange(sum_load) %>%
+  mutate(Line_Name = factor(Line_Name, levels = Line_Name)) %>%
+  ungroup()
+
+sorted_lines <- df_line_boarding_by_direction %>% pull(Line_Name)
+
+# 函数：生成每种 Day Type 的 df_combined 格式
+generate_daytype_sampled_data <- function(day_type_value) {
+  Passenger_Dataset %>%
+    filter(Day_Type == day_type_value) %>%
+    # mutate(Line_Name = recode(Line_Name,
+    #                         "Richmond and City Loop" = "Richmond and\nCity Loop")) %>% 
+    mutate(Line_Name = factor(Line_Name, levels = sorted_lines)) %>%
+    select(Arrival_Time_Scheduled, Line_Name, Passenger_Boardings) %>%
+    bind_rows(
+      .,
+      mutate(., Metric = "Passenger Boarding Density"),
+      mutate(., Metric = "Train Frequency Density", Passenger_Boardings = 1)
+    ) %>%
+    filter(!is.na(Metric)) %>%
+    group_by(Line_Name, Metric) %>%
+    sample_frac(0.1) %>%
+    ungroup()
+}
+
+# 制作 & 保存
+day_type_list <- c("Normal Weekday", "Normal Weekend", "Public Holiday", "School Holiday")
+output_names <- c("weekday", "weekend", "public", "school")
+
+for (i in seq_along(day_type_list)) {
+  day_type_data <- generate_daytype_sampled_data(day_type_list[i])
+  saveRDS(day_type_data, paste0("data/page_1.2_explore_", output_names[i], ".rds"))
+}
+
+```
+
+####制图
+##### All
+
+```{r}
+plot_daytype_overlay <- function(df, title_text) {
+  ggplot(df, aes(x = Arrival_Time_Scheduled, y = Line_Name, fill = Metric, colour = Metric)) +
+    geom_density_ridges(
+      aes(
+        height = ..density..,
+        weight = ifelse(Metric == "Passenger Boarding Density", Passenger_Boardings, 1),
+        group = interaction(Line_Name, Metric)
+      ),
+      alpha = 0.3,
+      scale = 1,
+      stat = "density"
+    ) +
+    scale_fill_manual(
+      values = c("Train Frequency Density" = "steelblue", "Passenger Boarding Density" = "darkorange")
+    ) +
+    scale_colour_manual(
+      values = c("Train Frequency Density" = "steelblue", "Passenger Boarding Density" = "darkorange")
+    ) +
+    scale_x_time(
+      labels = scales::label_time(format = "%H:%M"),
+      breaks = hms::hms(hours = seq(0, 24, by = 4))
+    ) +
+    labs(
+      title = title_text,
+      x = "Time of Day",
+      y = "Train Line"
+    ) +
+    theme_minimal(base_family = "serif") +
+    theme(
+      plot.title = element_text(size = 14, face = "bold"),
+      legend.position = "top",
+      axis.text.y = element_text(size = 8, face = "bold")
+    )
+}
+
+```
+
+```{r}
+df_all <- readRDS("data/page_1.2_story_mode.rds")
+plot_daytype_overlay(df_all, "All Day Types - Supply vs Demand")
+```
+
+
+##### Normal Weekday
+
+```{r}
+df_weekday <- readRDS("data/page_1.2_explore_weekday.rds")
+plot_daytype_overlay(df_weekday, "Normal Weekday - Supply vs Demand")
+```
+
+
+##### Normal Weekend
+
+```{r}
+df_weekend <- readRDS("data/page_1.2_explore_weekend.rds")
+plot_daytype_overlay(df_weekend, "Normal Weekend - Supply vs Demand")
+```
+
+
+##### Public Holiday
+
+```{r}
+df_public <- readRDS("data/page_1.2_explore_public.rds")
+plot_daytype_overlay(df_public, "Public Holiday - Supply vs Demand")
+```
+
+
+##### School Holiday
+
+```{r}
+df_school <- readRDS("data/page_1.2_explore_school.rds")
+plot_daytype_overlay(df_school, "School Holiday - Supply vs Demand")
+```
+
+
+## Page 1.3
+###原图
+
+####导入数据
+
+主数据
+```{r}
+Passenger_Dataset <- readRDS("data/train_service_passenger_counts_fy_2023_2024_edited.rds")
+```
+
+天气数据
+```{r}
+Weather_Dataset <- read_csv("data/meshed-sensor-type-1_edited.csv")
+Weather_Dataset
+```
+
+
+####数据预处理
+
+```{r}
+df_Weather_Hourly <- Weather_Dataset %>%
+  mutate(
+    date_hour = floor_date(time, unit = "hour")  # 统一到小时
+  ) %>%
+  group_by(date_hour) %>%
+  summarise(
+    solar = mean(solar, na.rm = TRUE),
+    precipitation = sum(precipitation, na.rm = TRUE),
+    strikes = sum(strikes, na.rm = TRUE),
+    windspeed = mean(windspeed, na.rm = TRUE),
+    winddirection = mean(winddirection, na.rm = TRUE),
+    vapourpressure = mean(vapourpressure, na.rm = TRUE),
+    atmosphericpressure = mean(atmosphericpressure, na.rm = TRUE),
+    relativehumidity = mean(relativehumidity, na.rm = TRUE),
+    airtemp = mean(airtemp, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+df_Passenger_Hourly <- Passenger_Dataset %>%
+  mutate(
+    date_hour = as.POSIXct(paste(Business_Date, sprintf("%02d:00:00", Arrival_Hour_Scheduled)),
+                           format = "%Y-%m-%d %H:%M:%S")
+  ) %>%
+  group_by(date_hour) %>%
+  summarise(
+    Day_of_Week = first(Day_of_Week),
+    Day_Type = first(Day_Type),
+    Train_Freq = n_distinct(paste(Train_Number, Station_Name)),
+    Direction_Up_Proportion = mean(Direction == "U", na.rm = TRUE),
+    Total_Boardings = sum(Passenger_Boardings, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+df_Combined_Hourly <- df_Passenger_Hourly %>%
+  left_join(df_Weather_Hourly, by = "date_hour")
+
+df_Combined_Hourly <- df_Combined_Hourly %>%
+  drop_na() %>% 
+  mutate(
+    Day_Type = case_when(
+      Day_Type %in% c("Saturday", "Sunday") ~ "Normal Weekend",
+      TRUE ~ as.character(Day_Type)
+    )
+  ) %>% 
+  mutate(
+    Day_Type = factor(Day_Type)
+  )
+
+saveRDS(df_Combined_Hourly, file = "data/page_1.3_weather_dataset_for_ml_model.rds")
+
+df_Combined_Hourly
+
+summary(df_Combined_Hourly)
+```
+
+#### 训练随机森林模型
+
+```{r}
+library(randomForest)
+library(Metrics)  # 用于计算 RMSE
+
+# 1. 准备数据
+# df_Combined_Hourly <- read_csv("../data/weather_dataset_for_rf_model.csv")
+df_Combined_Hourly <- readRDS("data/page_1.3_weather_dataset_for_ml_model.rds")
+
+# 2. 选择模型变量（你可以决定是否保留 Day_Type 等分类变量）
+
+# 3. 分训练集 / 测试集（80% / 20%）
+df_Combined_Hourly <- df_Combined_Hourly %>% select(-date_hour)
+n <- nrow(df_Combined_Hourly)
+train_idx <- sample(1:n, size = floor(0.8 * n))
+
+df_train <- df_Combined_Hourly[train_idx, ]
+df_test  <- df_Combined_Hourly[-train_idx, ]
+
+set.seed(45)      # 保证结果可复现
+
+# 4. 建模
+rf_model <- randomForest(
+  Total_Boardings ~ .,
+  data = df_train,
+  importance = TRUE,
+  ntree = 500
+)
+
+# 显示特征重要性
+importance(rf_model)
+varImpPlot(rf_model, type = 1)  # %IncMSE
+varImpPlot(rf_model, type = 2)  # IncNodePurity
+
+# 5. 预测
+train_preds <- predict(rf_model, newdata = df_train)
+test_preds  <- predict(rf_model, newdata = df_test)
+
+# 6. 评估 RMSE
+rmse_train <- rmse(df_train$Total_Boardings, train_preds)
+rmse_test  <- rmse(df_test$Total_Boardings, test_preds)
+
+# 7. 输出
+cat("✅ Train RMSE:", round(rmse_train, 2), "\n")
+cat("✅ Test RMSE :", round(rmse_test, 2), "\n")
+```
+
+#### 制图
+
+```{r}
+# library(tidyverse)
+# library(randomForest)
+
+# 1. 获取原始重要性度量
+importance_df <- importance(rf_model) %>%
+  as.data.frame() %>%
+  rownames_to_column(var = "Feature")  # 确保 Feature 列是字符
+
+# 2. 标准化两个度量（min-max scaling）
+importance_scaled <- importance_df %>%
+  mutate(
+    scaled_IncMSE = (`%IncMSE` - min(`%IncMSE`)) / (max(`%IncMSE`) - min(`%IncMSE`)),
+    scaled_IncPurity = (IncNodePurity - min(IncNodePurity)) / (max(IncNodePurity) - min(IncNodePurity)),
+    Mean_Scaled_Importance = (scaled_IncMSE + scaled_IncPurity) / 2
+  )
+
+# 3. 选择平均标准化重要性 Top 10 的特征
+top10_features <- importance_scaled %>%
+  arrange(desc(Mean_Scaled_Importance)) %>%
+  slice(1:10)
+
+# 4. 转换为长格式用于绘图
+importance_long <- top10_features %>%
+  select(Feature, scaled_IncMSE, scaled_IncPurity) %>%
+  rename(`%IncMSE` = scaled_IncMSE, IncNodePurity = scaled_IncPurity) %>%
+  pivot_longer(cols = c(`%IncMSE`, IncNodePurity), names_to = "Metric", values_to = "Scaled_Importance")
+
+# 创建 Feature label 替换映射表
+feature_label_map <- c(
+  "Train_Freq" = "Train Frequency",
+  "Direction_Up_Proportion" = "Up Direction %",
+  "solar" = "Solar Radiation",
+  "windspeed" = "Wind Speed",
+  "relativehumidity" = "Relative Humidity",
+  "airtemp" = "Air Temperature",
+  "Day_Type" = "Day Type",
+  "Day_of_Week" = "Day of Week",
+  "atmosphericpressure" = "Atmospheric Pressure",
+  "vapourpressure" = "Vapour Pressure"
+)
+
+# 创建 Metric label 映射
+metric_label_map <- c(
+  "%IncMSE" = "MSE Increase",
+  "IncNodePurity" = "Node Purity Increase"
+)
+
+# 应用 Feature 显示标签
+importance_long <- importance_long %>%
+  mutate(
+    Feature = feature_label_map[Feature],
+    Metric = metric_label_map[Metric]
+    # Feature = fct_relevel(Feature,top10_features$Feature, level = )
+    # Feature = fct_reorder(Feature, -Scaled_Importance, .fun = max)
+  )
+
+top10_features <- top10_features %>% mutate(Feature = feature_label_map[Feature])
+
+importance_long <- importance_long %>%
+  left_join(top10_features %>% select(Feature, Mean_Scaled_Importance), by = "Feature") %>%
+  mutate(Feature = fct_reorder(Feature, Mean_Scaled_Importance))
+
+# 6. 绘图
+ggplot(importance_long, aes(x = reorder(Feature, -Mean_Scaled_Importance), y = Scaled_Importance, fill = Metric)) +
+  geom_bar(stat = "identity", position = position_dodge(width = 0.7)) +
+  scale_fill_manual(values = c("MSE Increase" = "#1f77b4", "Node Purity Increase" = "#ff7f0e")) +
+  labs(
+    title = "Top 10 Features for Predicting Total Passenger Boardings",
+    x = "Features Used to Predict Total Boardings",
+    y = "Scaled Importance (0-1)",
+    fill = "Importance Metric"
+  ) +
+  theme_minimal(base_family = "serif") +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    plot.title = element_text(size = 14, face = "bold"),
+    legend.title = element_text(size = 10),
+    legend.text = element_text(size = 10)
+  )
+```
+```{r}
+importance_long
+```
+
+
+####保存story mode数据
+
+```{r}
+# 保存绘图用数据
+saveRDS(importance_long, file = "data/page_1.3_story_mode.rds")
+```
+
+####重新制图
+
+```{r}
+df_rf_importance <- readRDS("data/page_1.3_story_mode.rds")
+
+ggplot(df_rf_importance, aes(x = reorder(Feature, -Mean_Scaled_Importance), y = Scaled_Importance, fill = Metric)) +
+  geom_bar(stat = "identity", position = position_dodge(width = 0.7)) +
+  scale_fill_manual(values = c("MSE Increase" = "#1f77b4", "Node Purity Increase" = "#ff7f0e")) +
+  labs(
+    title = "Top 10 Features for Predicting Total Passenger Boardings",
+    x = "Features Used to Predict Total Boardings",
+    y = "Scaled Importance (0-1)",
+    fill = "Importance Metric"
+  ) +
+  theme_minimal(base_family = "serif") +
+  theme(
+    axis.text.x = element_text(size = 12, angle = 45, hjust = 1),
+    axis.text.y = element_text(size = 12),
+    axis.title = element_text(size = 12),
+    
+    plot.title = element_text(size = 16, face = "bold", color = "#2a475e"),
+    legend.title = element_text(size = 12),
+    legend.text = element_text(size = 12)
+  ) 
+```
+
+###Exploration Mode
+
+####数据预处理
+
+#####通用前处理
+```{r}
+library(tidyverse)
+library(caret)  # 用于数据标准化
+library(glmnet) # 用于 Lasso 回归
+library(randomForest)
+library(rpart)
+library(Metrics)
+
+set.seed(42)
+
+# 读取数据
+df <- readRDS("data/page_1.3_weather_dataset_for_ml_model.rds")
+df <- df %>% select(-date_hour)  # 移除时间列（若存在）
+
+# 分训练集与测试集
+n <- nrow(df)
+train_idx <- sample(n, floor(0.8 * n))
+df_train <- df[train_idx, ]
+df_test  <- df[-train_idx, ]
+```
+#####Decision Tree 的特征重要性
+
+```{r}
+library(rpart)
+
+tree_model <- rpart(Total_Boardings ~ ., data = df_train, method = "anova")
+
+dt_importance <- as.data.frame(tree_model$variable.importance) %>%
+  rownames_to_column("Feature") %>%
+  rename(Importance = `tree_model$variable.importance`) %>%
+  arrange(desc(Importance))
+
+saveRDS(dt_importance, "data/page_1.3_dt_importance.rds")
+```
+
+```{r}
+dt_importance
+```
+
+
+#####Linear Regression（标准化 + 系数）
+```{r}
+library(tidyverse)
+library(caret)
+
+set.seed(45)
+
+# ✅ 1. 移除所有含 NA 的行（不仅是目标变量）
+df_clean <- df_train %>%
+  drop_na()  # 全表 drop_na，比只清理 Total_Boardings 更稳妥
+
+# ✅ 2. 构建模型矩阵并标准化
+x <- model.matrix(~ ., data = df_clean %>% select(-Total_Boardings, -precipitation))[, -1]
+
+# 再次确认无 NA
+stopifnot(!any(is.na(x)))
+
+x <- scale(x)  # 标准化
+y <- df_clean$Total_Boardings
+
+# ✅ 3. 拟合线性模型
+lm_model <- lm(y ~ x)
+
+# ✅ 4. 提取系数（去除截距）
+lm_coefs <- coef(lm_model)[-1]
+
+# ✅ 5. 整理并保存结果
+
+# ✅ 构建 tibble
+lm_importance <- tibble(
+  Feature = names(lm_coefs),
+  Importance = abs(lm_coefs)
+)
+
+
+lm_importance_clean <- lm_importance %>%
+  mutate(Group = case_when(
+    str_detect(Feature, "Day_Type") ~ "Day_Type",
+    str_detect(Feature, "Day_of_Week") ~ "Day_of_Week",
+    TRUE ~ Feature
+  )) %>%
+  group_by(Group) %>%
+  summarise(Importance = sum(Importance), .groups = "drop") %>%
+  rename(Feature = Group) %>%
+  arrange(desc(Importance))
+
+# ✅ 去掉开头的 x（model.matrix 默认行为）
+lm_importance_clean$Feature <- str_remove(lm_importance_clean$Feature, "^x")
+
+saveRDS(lm_importance_clean, "data/page_1.3_lm_importance.rds")
+
+```
+
+```{r}
+lm_importance
+lm_importance_clean
+```
+
+
+#####Lasso Regression（标准化 + 非零系数）
+```{r}
+X <- model.matrix(Total_Boardings ~ ., data = df_train)[, -1]
+y <- df_train$Total_Boardings
+
+cv_lasso <- cv.glmnet(X, y, alpha = 1, standardize = TRUE)
+best_lambda <- cv_lasso$lambda.min
+
+lasso_coef <- coef(cv_lasso, s = best_lambda)
+lasso_importance <- as.data.frame(as.matrix(lasso_coef)) %>%
+  rownames_to_column("Feature") %>%
+  rename(Coefficient = `s0`) %>%
+  filter(Feature != "(Intercept)", Coefficient != 0) %>%
+  mutate(Importance = abs(Coefficient)) %>%
+  arrange(desc(Importance)) %>%
+  select(Feature, Importance)
+
+# saveRDS(lasso_importance, "data/page_1.3_lasso_importance.rds")
+
+lasso_importance_clean <- lasso_importance %>%
+  mutate(Group = case_when(
+    grepl("^Day_Type", Feature) ~ "Day_Type",
+    grepl("^Day_of_Week", Feature) ~ "Day_of_Week",
+    TRUE ~ Feature
+  )) %>%
+  group_by(Group) %>%
+  summarise(Importance = sum(Importance)) %>%
+  rename(Feature = Group)
+
+saveRDS(lasso_importance_clean, "data/page_1.3_lasso_importance.rds")
+```
+
+```{r}
+lasso_importance
+lasso_importance_clean
+```
+
+
+# Page 2
+## Page 2.1
+###原图
+```{r}
+library(ggforce)
+
+# Step 1: 数据准备（假设你已经有 Passenger_Dataset）
+# Passenger_Dataset <- Passenger_Dataset %>%
+#   mutate(
+#     Time_Bin = case_when(
+#       Arrival_Hour_Scheduled < 4  ~ "00:00–04:00",
+#       Arrival_Hour_Scheduled < 8  ~ "04:00–08:00",
+#       Arrival_Hour_Scheduled < 12 ~ "08:00–12:00",
+#       Arrival_Hour_Scheduled < 16 ~ "12:00–16:00",
+#       Arrival_Hour_Scheduled < 20 ~ "16:00–20:00",
+#       TRUE                        ~ "20:00–00:00"
+#     ),
+#     Day_Type = case_when(
+#       Day_Type %in% c("Saturday", "Sunday") ~ "Normal Weekend",
+#       TRUE ~ Day_Type
+#     )
+#   )
+
+# 汇总进站和出站数据
+df_flow <- Passenger_Dataset %>%
+  group_by(Day_Type, Time_Bin) %>%
+  summarise(
+    Boardings = mean(Passenger_Boardings, na.rm = TRUE),
+    Alightings = mean(Passenger_Alightings, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  mutate(
+    Total = Boardings + Alightings,
+    Time_Bin = factor(Time_Bin, levels = c(
+      "00:00–04:00", "04:00–08:00", "08:00–12:00",
+      "12:00–16:00", "16:00–20:00", "20:00–00:00")),
+    Day_Type = factor(Day_Type, levels = c(
+      "Normal Weekday", "Normal Weekend", "Public Holiday", "School Holiday")),
+    r = sqrt(Total) / sqrt(max(Total)) * 0.35  # 半径缩放
+  )
+
+# 然后再转换为长格式
+df_long <- df_flow %>%
+  pivot_longer(cols = c(Boardings, Alightings), names_to = "Type", values_to = "Value") %>%
+  group_by(Day_Type, Time_Bin) %>%
+  mutate(
+    prop = Value / sum(Value),
+    start = cumsum(lag(prop, default = 0)) * 2 * pi,
+    end = cumsum(prop) * 2 * pi,
+    mid = (start + end) / 2
+  ) %>%
+  ungroup()
+
+# 计算圆心位置（Time_Bin 为 x，Day_Type 为 y）
+df_long <- df_long %>%
+  mutate(
+    x = as.numeric(Time_Bin),
+    y = as.numeric(fct_rev(Day_Type))
+  )
+
+# --- 定义比例尺圆圈（对应平均人流量值） ---
+scale_vals <- c(10, 25, 40)  # 平均人流参考值
+scale_r <- sqrt(scale_vals) / sqrt(max(df_flow$Total)) * 0.35  # 对应半径（与主图同比例）
+legend_x <- 7.4
+legend_y_base <- 4.5
+
+legend_df <- tibble(
+  x0 = legend_x,
+  y0 = legend_y_base - cumsum(scale_r * 2) + scale_r[1],
+  r = scale_r,
+  label = paste0(scale_vals, " pax")
+)
+
+# --- 绘图 ---
+
+# Plot
+ggplot(df_long) +
+  geom_arc_bar(
+    aes(
+      x0 = x, y0 = y, r0 = 0, r = r,
+      start = start, end = end,
+      fill = Type
+    ),
+    color = "white", size = 0.3, alpha = 0.9
+  ) +
+  scale_fill_manual(values = c("Boardings" = "steelblue", "Alightings" = "darkorange")) +
+  scale_x_continuous(
+    breaks = 1:6,
+    labels = levels(df_long$Time_Bin),
+    expand = expansion(mult = 0.1)
+  ) +
+  scale_y_continuous(
+    breaks = 1:4,
+    labels = rev(levels(df_long$Day_Type)),
+    expand = expansion(mult = 0.1)
+  ) +
+  labs(
+    x = "Time of Day",
+    y = "Day Type",
+    fill = "Flow Type",
+    title = "Hourly Station Passenger Volume Composition by Day Type"
+  ) +
+  # coord_fixed() +
+  theme_minimal(base_family = "serif") +
+  theme(
+    plot.title = element_text(size = 14, face = "bold"),
+    axis.title = element_text(size = 10),
+    # axis.text = element_text(size = 10),
+    legend.title = element_text(size = 10),
+    legend.text = element_text(size = 10),
+    axis.text.x = element_text(size = 8),
+    axis.text.y = element_text(size = 8)
+  ) + 
+  geom_text(
+    data = df_flow, 
+    aes(x = as.numeric(Time_Bin), 
+        y = as.numeric(fct_rev(Day_Type)) - r - 0.075, 
+        label = paste0(round(100 * Boardings / Total), "%")),
+    color = "steelblue",
+    size = 2.5
+  ) +
+  
+  # 添加平均人流量标签（总量）
+  geom_text(
+    data = df_flow, 
+    aes(x = as.numeric(Time_Bin), 
+        y = as.numeric(fct_rev(Day_Type)) - r - 0.18, 
+        label = paste0(round(Total), " pax")),
+    color = "gray40",
+    size = 2.5
+  )
+
+```
+
+###story mode 1
+```{r}
+# ---- 数据准备 ----
+df_story1 <- df_flow %>%
+  summarise(
+    Boardings = mean(Boardings),
+    Alightings = mean(Alightings)
+  ) %>%
+  pivot_longer(everything(), names_to = "Type", values_to = "Value") %>%
+  mutate(
+    prop = Value / sum(Value),
+    label = paste0(Type, ": ", round(100 * prop), "%")
+  )
+
+# ---- 画图 ----
+ggplot(df_story1, aes(x = "", y = Value, fill = Type)) +
+  geom_bar(stat = "identity", width = 1, color = "white") +
+  coord_polar(theta = "y") +
+  geom_text(aes(label = label), position = position_stack(vjust = 0.5), size = 5, color = "white") +
+  scale_fill_manual(values = c("Boardings" = "steelblue", "Alightings" = "darkorange")) +
+  labs(
+    title = "Average Onboard vs. Alight Passenger Share per Station",
+    fill = "Flow Type"
+  ) +
+  theme_void(base_family = "serif") +
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 14, face = "bold"),
+    legend.title = element_text(size = 11),
+    legend.text = element_text(size = 11)
+  )
+
+```
+
+###story mode 2
+
+```{r}
+library(ggforce)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+
+library(showtext)
+library(sysfonts)
+
+font_add_google("Roboto", "roboto")
+showtext_auto()
+
+
+# ---- 数据准备 ----
+df_story1 <- Passenger_Dataset %>%
+  mutate(
+    Day_Type = case_when(
+      Day_Type %in% c("Saturday", "Sunday") ~ "Normal Weekend",
+      TRUE ~ Day_Type
+    )
+  ) %>%
+  group_by(Day_Type) %>%
+  summarise(
+    Boardings = mean(Passenger_Boardings, na.rm = TRUE),
+    Alightings = mean(Passenger_Alightings, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  pivot_longer(cols = c(Boardings, Alightings), names_to = "Type", values_to = "Value") %>%
+  group_by(Day_Type) %>%
+  mutate(
+    Total = sum(Value),
+    prop = Value / Total,
+    start = cumsum(lag(prop, default = 0)) * 2 * pi,
+    end = cumsum(prop) * 2 * pi,
+    mid = (start + end) / 2
+  ) %>%
+  ungroup() %>%
+  mutate(
+    Day_Type = factor(Day_Type, levels = c("Normal Weekday", "Normal Weekend", "Public Holiday", "School Holiday")),
+    x = as.numeric(Day_Type),
+    y = 1,
+    r = sqrt(Total) / sqrt(max(Total)) * 0.45  # 半径反映平均总量
+  )
+
+write_csv(df_story1, "data/page_2.1_story1.csv")
+```
+
+```{r}
+library(ggforce)
+library(showtext)
+library(sysfonts)
+
+font_add_google("Roboto", "roboto")
+showtext_auto()
+
+# 读取数据
+df_story1 <- read_csv("data/page_2.1_story1.csv")
+
+# 手动将 Day_Type 设置为有序因子
+df_story1 <- df_story1 %>%
+  mutate(Day_Type = factor(
+    Day_Type,
+    levels = c("Normal Weekday", "Normal Weekend", "Public Holiday", "School Holiday"),
+    ordered = TRUE
+  ))
+
+
+df_labels <- df_story1 %>%
+  mutate(
+    label_pct = paste0(round(prop * 100), "%"),
+    label_pax = paste0(round(Total), " pax"),
+    x_label = ifelse(Type == "Boardings", x - r * 0.5, x + r * 0.5),  # 左右分开
+    y_label = y,
+    y_pax = y - r - 0.10
+  )
+
+# ---- 绘图 ----
+ggplot(df_story1) +
+  geom_arc_bar(
+    aes(x0 = x, y0 = y, r0 = 0, r = r, start = start, end = end, fill = Type),
+    color = "white",
+    size = 0.4,
+    alpha = 0.95
+  ) +
+  scale_fill_manual(values = c("Boardings" = "steelblue", "Alightings" = "darkorange")) +
+  scale_x_continuous(
+    breaks = 1:4,
+    labels = levels(df_story1$Day_Type),
+    expand = expansion(mult = 0.1)
+  ) +
+  coord_fixed() +
+  labs(
+    x = NULL, y = NULL,
+    title = "Passenger Flow Composition by Day Type",
+    fill = "Flow Type"
+  ) +
+  theme_minimal(base_family = "roboto") +
+  theme(
+    # plot.title = element_text(size = 14, face = "bold"),
+    axis.text.y = element_blank(),
+    axis.text.x = element_text(size = 12),
+    legend.title = element_text(size = 12),
+    legend.text = element_text(size = 12),
+    plot.title = ggtext::element_textbox_simple(
+      size = 15,
+      face = "bold",
+      color = "#2a475e",
+      family = "roboto",
+      margin = margin(b = 20, unit = "pt")  # 往上挪一些（负值）
+    )
+  ) +
+    # 添加百分比标签
+  geom_text(
+    data = df_labels,
+    aes(x = x_label, y = y_label, label = label_pct),
+    size = 4,
+    color = "white"
+  ) +
+  geom_text(
+    data = df_labels %>% distinct(Day_Type, x, y_pax, label_pax),
+    aes(x = x, y = y_pax, label = label_pax),
+    size = 4,
+    color = "gray40"
+  )
+```
+
+
+
+
+###story mode 3
+```{r}
+df_story2 <- Passenger_Dataset %>%
+  # mutate(
+  #   Time_Bin = case_when(
+  #     Arrival_Hour_Scheduled < 4  ~ "00:00–04:00",
+  #     Arrival_Hour_Scheduled < 8  ~ "04:00–08:00",
+  #     Arrival_Hour_Scheduled < 12 ~ "08:00–12:00",
+  #     Arrival_Hour_Scheduled < 16 ~ "12:00–16:00",
+  #     Arrival_Hour_Scheduled < 20 ~ "16:00–20:00",
+  #     TRUE                        ~ "20:00–00:00"
+  #   )
+  # ) %>%
+  group_by(Time_Bin) %>%
+  summarise(
+    Boardings = mean(Passenger_Boardings, na.rm = TRUE),
+    Alightings = mean(Passenger_Alightings, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  pivot_longer(cols = c(Boardings, Alightings), names_to = "Type", values_to = "Value") %>%
+  group_by(Time_Bin) %>%
+  mutate(
+    Total = sum(Value),
+    prop = Value / Total,
+    start = cumsum(lag(prop, default = 0)) * 2 * pi,
+    end = cumsum(prop) * 2 * pi,
+    mid = (start + end) / 2
+  ) %>%
+  ungroup() %>%
+  mutate(
+    Time_Bin = factor(Time_Bin, levels = c(
+      "00:00–04:00", "04:00–08:00", "08:00–12:00",
+      "12:00–16:00", "16:00–20:00", "20:00–00:00")),
+    x = as.numeric(Time_Bin),
+    y = 1,
+    r = sqrt(Total) / sqrt(max(Total)) * 0.45
+  )
+
+write_csv(df_story2, "data/page_2.1_story2.csv")
+df_story2
+```
+
+```{r}
+# col_spec <- cols(
+#   Time_Bin = col_factor(
+#     levels = c('00:00–04:00', '04:00–08:00', '08:00–12:00', '12:00–16:00', '16:00–20:00', '20:00–00:00'),
+#     ordered = TRUE
+#   ))
+
+df_story2 <- read_csv("data/page_2.1_story2.csv")
+
+df_story2 <- df_story2 %>%
+  mutate(Time_Bin = factor(Time_Bin, levels = c(
+    '00:00–04:00', '04:00–08:00', '08:00–12:00',
+    '12:00–16:00', '16:00–20:00', '20:00–00:00'
+  ))) %>% 
+  mutate(
+    r_raw = sqrt(Total) / sqrt(max(Total)) * 0.45,
+    r = pmax(r_raw, 0.25)  # 最小半径不小于 0.17（你可以调整这个数）
+  )
+
+df_labels2 <- df_story2 %>%
+  mutate(
+    label_pct = paste0(round(prop * 100), "%"),
+    label_pax = paste0(round(Total), " pax"),
+    x_label = ifelse(Type == "Boardings", x - r * 0.5, x + r * 0.5),
+    y_label = y,
+    y_pax = y - r - 0.2
+  )
+
+ggplot(df_story2) +
+  geom_arc_bar(
+    aes(x0 = x, y0 = y, r0 = 0, r = r, start = start, end = end, fill = Type),
+    color = "white", size = 0.4, alpha = 0.95
+  ) +
+  scale_fill_manual(values = c("Boardings" = "steelblue", "Alightings" = "darkorange")) +
+  scale_x_continuous(
+    breaks = 1:6,
+    labels = levels(df_story2$Time_Bin),
+    expand = expansion(mult = 0.1)
+  ) +
+  coord_fixed() +
+  labs(
+    x = NULL, y = NULL,
+    title = "Passenger Flow Composition by Time of Day",
+    fill = "Flow Type"
+  ) +
+  theme_minimal(base_family = "roboto") +
+  theme(
+    axis.text.y = element_blank(),
+    axis.text.x = element_text(size = 12),
+    legend.title = element_text(size = 12),
+    legend.text = element_text(size = 12),
+    plot.title = ggtext::element_textbox_simple(
+      size = 15,
+      face = "bold",
+      color = "#2a475e",
+      family = "roboto",
+      margin = margin(b = 20, unit = "pt")
+    )
+  ) +
+  geom_text(
+    data = df_labels2,
+    aes(x = x_label, y = y_label, label = label_pct),
+    size = 4,
+    color = "white"
+  ) +
+  geom_text(
+    data = df_labels2 %>% distinct(Time_Bin, x, y_pax, label_pax),
+    aes(x = x, y = y_pax, label = label_pax),
+    size = 4,
+    color = "gray40"
+  )
+
+```
+
+###story mode 4
+####版本1
+```{r}
+# 数据准备
+df_story4 <- Passenger_Dataset %>%
+  # mutate(
+  #   Time_Bin = case_when(
+  #     Arrival_Hour_Scheduled < 4  ~ "00:00–04:00",
+  #     Arrival_Hour_Scheduled < 8  ~ "04:00–08:00",
+  #     Arrival_Hour_Scheduled < 12 ~ "08:00–12:00",
+  #     Arrival_Hour_Scheduled < 16 ~ "12:00–16:00",
+  #     Arrival_Hour_Scheduled < 20 ~ "16:00–20:00",
+  #     TRUE                        ~ "20:00–00:00"
+  #   ),
+  #   Day_Type = case_when(
+  #     Day_Type %in% c("Saturday", "Sunday") ~ "Normal Weekend",
+  #     TRUE ~ Day_Type
+  #   )
+  # ) %>%
+  group_by(Day_Type, Time_Bin) %>%
+  summarise(
+    Boardings = mean(Passenger_Boardings, na.rm = TRUE),
+    Alightings = mean(Passenger_Alightings, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  mutate(
+    Time_Bin = factor(Time_Bin, levels = c(
+      "00:00–04:00", "04:00–08:00", "08:00–12:00",
+      "12:00–16:00", "16:00–20:00", "20:00–00:00"
+    )),
+    Day_Type = factor(Day_Type, levels = c(
+      "Normal Weekday", "Normal Weekend", "Public Holiday", "School Holiday"
+    ))
+  ) %>%
+  mutate(x = as.numeric(Time_Bin),
+         y = as.numeric(fct_rev(Day_Type))) %>%  # y 倒转方向
+  mutate(Total = Boardings + Alightings) %>%
+  mutate(r_raw = sqrt(Total) / sqrt(max(Total)) * 0.35,
+         r = pmax(r_raw, 0.17))  # 设置最小半径
+
+# 转换为长格式
+df_story4_long <- df_story4 %>%
+  pivot_longer(cols = c(Boardings, Alightings), names_to = "Type", values_to = "Value") %>%
+  group_by(Day_Type, Time_Bin) %>%
+  mutate(
+    prop = Value / sum(Value),
+    start = cumsum(lag(prop, default = 0)) * 2 * pi,
+    end = cumsum(prop) * 2 * pi,
+    mid = (start + end) / 2
+  ) %>%
+  ungroup()
+
+# 标签位置
+df_labels4 <- df_story4_long %>%
+  mutate(
+    label_pct = paste0(round(prop * 100), "%"),
+    label_pax = paste0(round(Total), " pax"),
+    x_label = ifelse(Type == "Boardings", x - r * 0.5, x + r * 0.5),
+    y_label = y,
+    y_pax = y - r - 0.18
+  )
+
+df_story4
+```
+
+```{r}
+ggplot(df_story4_long) +
+  geom_arc_bar(
+    aes(x0 = x, y0 = y, r0 = 0, r = r,
+        start = start, end = end, fill = Type),
+    color = "white", size = 0.3, alpha = 0.95
+  ) +
+  scale_fill_manual(values = c("Boardings" = "steelblue", "Alightings" = "darkorange")) +
+  scale_x_continuous(
+    breaks = 1:6,
+    labels = levels(df_story4$Time_Bin),
+    expand = expansion(mult = 0.1)
+  ) +
+  scale_y_continuous(
+    breaks = 1:4,
+    labels = rev(levels(df_story4$Day_Type)),
+    expand = expansion(mult = 0.1)
+  ) +
+  coord_fixed() +
+  labs(
+    title = "Hourly Station Passenger Volume Composition by Day Type",
+    x = NULL, y = NULL, fill = "Flow Type"
+  ) +
+  theme_minimal(base_family = "roboto") +
+  theme(
+    plot.title = ggtext::element_textbox_simple(
+      size = 15,
+      face = "bold",
+      family = "roboto",
+      color = "#2a475e",
+      margin = margin(b = 20, unit = "pt")
+    ),
+    axis.text.x = element_text(size = 10),
+    axis.text.y = element_text(size = 10),
+    legend.title = element_text(size = 11),
+    legend.text = element_text(size = 10)
+  ) +
+
+  # 标签
+  geom_text(data = df_labels4,
+            aes(x = x_label, y = y_label, label = label_pct),
+            size = 3.5, color = "white", fontface = "bold") +
+  geom_text(data = df_labels4 %>% distinct(Day_Type, Time_Bin, x, y, y_pax, label_pax),
+            aes(x = x, y = y_pax, label = label_pax),
+            size = 3, color = "gray40") +
+
+  # annotation: 最大（Weekday, 16:00–20:00）@ x=5, y=4
+  annotate("segment", x = 5, xend = 5.5, y = 4, yend = 4.4,
+           arrow = arrow(length = unit(0.15, "cm")), color = "#2a475e") +
+  annotate("text", x = 5.8, y = 4.4,
+           label = "Most crowded period:\nWeekday 16:00–20:00",
+           family = "roboto", size = 4.2, hjust = 0, color = "#2a475e") +
+
+  # annotation: 最小（Public Holiday, 00:00–04:00）@ x=1, y=2
+  annotate("segment", x = 1, xend = 0.4, y = 2, yend = 1.6,
+           arrow = arrow(length = unit(0.15, "cm")), color = "#2a475e") +
+  annotate("text", x = 0.4, y = 1.5,
+           label = "Least crowded period:\nPublic Holiday 00:00–04:00",
+           family = "roboto", size = 4.2, hjust = 0, color = "#2a475e")
+
+```
+####版本2
+
+```{r}
+# 汇总进站和出站数据
+df_story34 <- Passenger_Dataset %>%
+  group_by(Day_Type, Time_Bin) %>%
+  summarise(
+    Boardings = mean(Passenger_Boardings, na.rm = TRUE),
+    Alightings = mean(Passenger_Alightings, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  mutate(
+    Total = Boardings + Alightings,
+    Time_Bin = factor(Time_Bin, levels = c(
+      "00:00–04:00", "04:00–08:00", "08:00–12:00",
+      "12:00–16:00", "16:00–20:00", "20:00–00:00")),
+    Day_Type = factor(Day_Type, levels = c(
+      "Normal Weekday", "Normal Weekend", "Public Holiday", "School Holiday")),
+    r = sqrt(Total) / sqrt(max(Total)) * 0.35  # 半径缩放
+  )
+
+write_csv(df_story34, "data/page_2.1_story3_story4.csv")
+df_story34
+```
+
+``` {r}
+df_story34 <- read_csv("data/page_2.1_story3_story4.csv")
+
+df_story34 <- df_story34 %>% 
+  mutate(Day_Type = factor(
+    Day_Type,
+    levels = c("Normal Weekday", "Normal Weekend", "Public Holiday", "School Holiday"),
+    ordered = TRUE
+  )) %>% 
+  mutate(Time_Bin = factor(Time_Bin, levels = c(
+    '00:00–04:00', '04:00–08:00', '08:00–12:00',
+    '12:00–16:00', '16:00–20:00', '20:00–00:00'
+  )))
+  
+# 然后再转换为长格式
+df_long34 <- df_story34 %>%
+  pivot_longer(cols = c(Boardings, Alightings), names_to = "Type", values_to = "Value") %>%
+  group_by(Day_Type, Time_Bin) %>%
+  mutate(
+    prop = Value / sum(Value),
+    start = cumsum(lag(prop, default = 0)) * 2 * pi,
+    end = cumsum(prop) * 2 * pi,
+    mid = (start + end) / 2
+  ) %>%
+  ungroup()
+
+# 计算圆心位置（Time_Bin 为 x，Day_Type 为 y）
+df_long34 <- df_long34 %>%
+  mutate(
+    x = as.numeric(Time_Bin),
+    y = as.numeric(fct_rev(Day_Type))
+  )
+
+# --- 定义比例尺圆圈（对应平均人流量值） ---
+scale_vals <- c(10, 25, 40)  # 平均人流参考值
+scale_r <- sqrt(scale_vals) / sqrt(max(df_story34$Total)) * 0.35  # 对应半径（与主图同比例）
+legend_x <- 7.4
+legend_y_base <- 4.5
+
+legend_df <- tibble(
+  x0 = legend_x,
+  y0 = legend_y_base - cumsum(scale_r * 2) + scale_r[1],
+  r = scale_r,
+  label = paste0(scale_vals, " pax")
+)
+
+# --- 绘图 ---
+
+# Plot
+ggplot(df_long34) +
+  geom_arc_bar(
+    aes(
+      x0 = x, y0 = y, r0 = 0, r = r,
+      start = start, end = end,
+      fill = Type
+    ),
+    color = "white", size = 0.3, alpha = 0.9
+  ) +
+  scale_fill_manual(values = c("Boardings" = "steelblue", "Alightings" = "darkorange")) +
+  scale_x_continuous(
+    breaks = 1:6,
+    labels = levels(df_long34$Time_Bin),
+    expand = expansion(mult = 0.1)
+  ) +
+  scale_y_continuous(
+    breaks = 1:4,
+    labels = rev(levels(df_long34$Day_Type)),
+    expand = expansion(mult = 0.1)
+  ) +
+  labs(
+    x = "Time of Day",
+    y = "Day Type",
+    fill = "Flow Type",
+    title = "Hourly Station Passenger Volume Composition by Day Type and Time of Day"
+  ) +
+  # coord_fixed() +
+  theme_minimal(base_family = "roboto") +
+  theme(
+    plot.title = element_text(size = 16, face = "bold", color = "#2a475e"),
+    axis.title = element_text(size = 12),
+    # axis.text = element_text(size = 10),
+    legend.title = element_text(size = 12),
+    legend.text = element_text(size = 12),
+    axis.text.x = element_text(size = 12),
+    axis.text.y = element_text(size = 12)
+  ) + 
+  geom_text(
+    data = df_story34, 
+    aes(x = as.numeric(Time_Bin), 
+        y = as.numeric(fct_rev(Day_Type)) - r - 0.075, 
+        label = paste0(round(100 * Boardings / Total), "%")),
+    color = "steelblue",
+    size = 3.2
+  ) +
+  
+  # 添加平均人流量标签（总量）
+  geom_text(
+    data = df_story34, 
+    aes(x = as.numeric(Time_Bin), 
+        y = as.numeric(fct_rev(Day_Type)) - r - 0.18, 
+        label = paste0(round(Total), " pax")),
+    color = "gray40",
+    size = 3.2
+  ) +
+  # ---- Annotations for max and min ----
+  annotate("rect",
+           xmin = 4.5, xmax = 5.5, ymin = 3.4, ymax = 4.4,
+           alpha = 0.1, color = "#2a475e", fill = "#2a475e") +
+
+  annotate("rect",
+           xmin = 0.7, xmax = 1.3, ymin = 1.6, ymax = 2.2,
+           alpha = 0.1, color = "#2a475e", fill = "#2a475e") 
+
+
+```
+
+###story mode 5
+
+```{r}
+ggplot(df_long34) +
+  geom_arc_bar(
+    aes(
+      x0 = x, y0 = y, r0 = 0, r = r,
+      start = start, end = end,
+      fill = Type
+    ),
+    color = "white", size = 0.3, alpha = 0.9
+  ) +
+  scale_fill_manual(values = c("Boardings" = "steelblue", "Alightings" = "darkorange")) +
+  scale_x_continuous(
+    breaks = 1:6,
+    labels = levels(df_long34$Time_Bin),
+    expand = expansion(mult = 0.1)
+  ) +
+  scale_y_continuous(
+    breaks = 1:4,
+    labels = rev(levels(df_long34$Day_Type)),
+    expand = expansion(mult = 0.1)
+  ) +
+  labs(
+    x = "Time of Day",
+    y = "Day Type",
+    fill = "Flow Type",
+    title = "Hourly Station Passenger Volume Composition by Day Type and Time of Day"
+  ) +
+  # coord_fixed() +
+  theme_minimal(base_family = "roboto") +
+  theme(
+    plot.title = element_text(size = 15, face = "bold", color = "#2a475e"),
+    axis.title = element_text(size = 12),
+    # axis.text = element_text(size = 10),
+    legend.title = element_text(size = 12),
+    legend.text = element_text(size = 12),
+    axis.text.x = element_text(size = 12),
+    axis.text.y = element_text(size = 12)
+  ) + 
+  geom_text(
+    data = df_story34, 
+    aes(x = as.numeric(Time_Bin), 
+        y = as.numeric(fct_rev(Day_Type)) - r - 0.075, 
+        label = paste0(round(100 * Boardings / Total), "%")),
+    color = "steelblue",
+    size = 3.2
+  ) +
+  
+  # 添加平均人流量标签（总量）
+  geom_text(
+    data = df_story34, 
+    aes(x = as.numeric(Time_Bin), 
+        y = as.numeric(fct_rev(Day_Type)) - r - 0.18, 
+        label = paste0(round(Total), " pax")),
+    color = "gray40",
+    size = 3.2
+  ) +
+  annotate("rect",
+         xmin = 0.6, xmax = 3.4, ymin = 1.5, ymax = 4.4,  
+         alpha = 0.1, color = "#2a475e", fill = "#2a475e")
+```
+
+### Exploration Mode数据预处理
+
+```{r}
+df_story34
+```
+
+```{r}
+df_explore_2.1 <- Passenger_Dataset %>%
+  group_by(Station_Name, Day_Type, Time_Bin) %>%
+  summarise(
+    Boardings = mean(Passenger_Boardings, na.rm = TRUE),
+    Alightings = mean(Passenger_Alightings, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  mutate(
+    Total = Boardings + Alightings,
+    Day_Type = factor(Day_Type, levels = c(
+      "Normal Weekday", "Normal Weekend", "Public Holiday", "School Holiday"
+    )),
+    Time_Bin = factor(Time_Bin, levels = c(
+      "00:00–04:00", "04:00–08:00", "08:00–12:00",
+      "12:00–16:00", "16:00–20:00", "20:00–00:00"
+    ))
+  )
+
+write_csv(df_explore_2.1, "data/page_2.1_exploration_mode.csv")
+df_explore_2.1
+```
+
+```{r}
+df_explore_2.1 <- read_csv("data/page_2.1_exploration_mode.csv")
+
+df_explore_2.1 <- df_explore_2.1 %>% 
+    mutate(Day_Type = factor(
+    Day_Type,
+    levels = c("Normal Weekday", "Normal Weekend", "Public Holiday", "School Holiday"),
+    ordered = TRUE
+  )) %>% 
+  mutate(Time_Bin = factor(Time_Bin, levels = c(
+    '00:00–04:00', '04:00–08:00', '08:00–12:00',
+    '12:00–16:00', '16:00–20:00', '20:00–00:00'
+  )))
+
+df_explore_2.1
+```
+
+
+## Page 2.2
+### 模板
+
+```{r}
+# Load package
+# devtools::install_github("mattflor/chorddiag")
+library(chorddiag)
+
+# Create dummy data
+m <- matrix(
+  c(
+    11975, 5871, 8916, 2868,
+    1951, 10048, 2060, 6171,
+    8010, 16145, 8090, 8045,
+    1013, 990, 940, 6907
+  ),
+  byrow = TRUE,
+  nrow = 4, ncol = 4
+)
+
+# A vector of 4 colors for 4 groups
+haircolors <- c("black", "blonde", "brown", "red")
+
+dimnames(m) <- list(
+  have = haircolors,
+  prefer = haircolors
+)
+
+groupColors <- c("#000000", "#FFDD89", "#957244", "#F26223")
+
+# Build the chord diagram:
+p <- chorddiag(m, groupColors = groupColors, groupnamePadding = 20)
+p
+
+# save the widget
+# library(htmlwidgets)
+# saveWidget(p, file=paste0( getwd(), "/HtmlWidget/chord_interactive.html"))
+```
+
+```{r}
+m
+```
+
+
+### 实现
+#### 导入数据
+```{r}
+col_spec <- cols(
+  Business_Date = col_date(format = ""),
+  Day_of_Week = col_factor(
+    levels = c("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"),
+    ordered = TRUE
+  ),
+  Day_Type = col_factor(),
+  # Mode = col_factor(),
+  Train_Number = col_character(),
+  Line_Name = col_factor(),
+  # Group = col_factor(),
+  Direction = col_factor(),
+  Origin_Station = col_factor(),
+  Destination_Station = col_factor(),
+  Station_Name = col_factor(),
+  Station_Latitude = col_double(),
+  Station_Longitude = col_double(),
+  Station_Chainage = col_integer(),
+  Stop_Sequence_Number = col_integer(),
+  Arrival_Time_Scheduled = col_time(format = ""),
+  Departure_Time_Scheduled = col_time(format = ""),
+  Passenger_Boardings = col_integer(),
+  Passenger_Alightings = col_integer(),
+  Passenger_Arrival_Load = col_integer(),
+  Passenger_Departure_Load = col_integer()
+)
+
+Passenger_Dataset <- read_csv(
+  "data/train_service_passenger_counts_fy_2023_2024_edited.csv",
+  col_types = col_spec
+)
+
+Passenger_Dataset
+```
+
+```{r}
+Passenger_Dataset %>% 
+  filter(Line_Name == "Richmond and City Loop")
+
+Passenger_Dataset %>% 
+  filter(Line_Name == "Richmond and City Loop") %>% 
+  group_by(Stop_Sequence_Number, Station_Name) %>% 
+  count()
+
+Passenger_Dataset %>% 
+  filter(Line_Name == "Richmond and City Loop") %>% 
+  group_by(Station_Name) %>% 
+  count()
+
+Passenger_Dataset %>% 
+  filter(Line_Name == "Richmond and City Loop") %>% 
+  group_by(Stop_Sequence_Number, Station_Name) %>% 
+  count()
+
+Passenger_Dataset %>% 
+  filter(Line_Name == "Richmond and City Loop") %>% 
+  group_by(Train_Number, Stop_Sequence_Number, Station_Name) %>% 
+  count() 
+
+Passenger_Dataset %>% 
+  filter(Line_Name == "Richmond and City Loop") %>% 
+  group_by(Train_Number, Stop_Sequence_Number, Station_Name) %>% 
+  count() %>% 
+  arrange(desc(n))
+
+Passenger_Dataset %>% 
+  filter(Line_Name == "Richmond and City Loop") %>% 
+  filter(Train_Number == "8794-dummy") 
+
+Passenger_Dataset %>% 
+  filter(Line_Name == "Richmond and City Loop") %>% 
+  arrange(desc(Passenger_Arrival_Load))
+
+Passenger_Dataset %>% 
+  filter(Line_Name == "Richmond and City Loop") %>% 
+  count(Train_Number)
+```
+
+
+#### 数据预处理，但是有问题
+
+```{r}
+library(dplyr)
+library(tidyr)
+library(purrr)
+
+# City Loop 六个目标站
+city_loop_stations <- c("Flagstaff", "Melbourne Central", "Parliament", "Flinders Street", "Richmond", "Southern Cross")
+
+# 筛选数据：仅包含6站 & 相关字段
+filtered_data <- Passenger_Dataset %>%
+  filter(Station_Name %in% city_loop_stations) %>%
+  select(Train_Number, Stop_Sequence_Number, Station_Name,
+         Passenger_Boardings, Passenger_Alightings) %>%
+  arrange(Train_Number, Stop_Sequence_Number)
+
+# 初始化空列表，用于收集 OD 记录
+od_records <- list()
+
+# 获取所有列车编号
+train_ids <- unique(filtered_data$Train_Number)
+train_ids <- unique(filtered_data$Train_Number)[1:50]
+
+# 遍历每列车
+for (train in train_ids) {
+  df <- filtered_data %>% filter(Train_Number == train)
+  
+  if (nrow(df) < 2) next  # 至少两站才可能有上下车
+
+  onboard_stack <- c()  # 栈：记录乘客来源站
+
+  for (i in 1:nrow(df)) {
+    station <- df$Station_Name[i]
+    board <- df$Passenger_Boardings[i]
+    alight <- df$Passenger_Alightings[i]
+
+    # Step 1: 上车 → 把每个乘客来源标记为当前站
+    if (board > 0) {
+      onboard_stack <- c(onboard_stack, rep(station, board))
+    }
+
+    # Step 2: 下车 → 从栈中取出这些乘客，形成 OD pair
+    if (alight > 0 && length(onboard_stack) > 0) {
+      actual_alight <- min(alight, length(onboard_stack))  # 防止空栈
+      from_stations <- onboard_stack[1:actual_alight]
+      onboard_stack <- onboard_stack[-(1:actual_alight)]
+
+      od_this_stop <- tibble(
+        From = from_stations,
+        To = rep(station, actual_alight)
+      )
+
+      od_records[[length(od_records) + 1]] <- od_this_stop
+    }
+  }
+}
+
+# 合并所有列车的记录
+od_all <- bind_rows(od_records)
+
+# 仅保留我们关心的6×6 OD pair（有些乘客可能上下车都不在这6站）
+od_filtered <- od_all %>%
+  filter(From %in% city_loop_stations,
+         To %in% city_loop_stations,
+         From != To)  # 去除对角线（同站上下）
+
+# 构建 OD 矩阵
+od_matrix_df <- od_filtered %>%
+  group_by(From, To) %>%
+  summarise(Count = n(), .groups = "drop") %>%
+  pivot_wider(names_from = To, values_from = Count, values_fill = 0) %>%
+  column_to_rownames("From")
+
+# 确保顺序统一
+od_matrix_df <- od_matrix_df[city_loop_stations, city_loop_stations]
+
+# 转换为矩阵格式供 chorddiag 使用
+od_matrix <- as.matrix(od_matrix_df)
+
+# 打印检查
+print(od_matrix)
+```
+
+
+```{r}
+filtered_data %>%
+  filter(Train_Number %in% unique(filtered_data$Train_Number)[1:200]) %>%
+  summarise(
+    total_boarding = sum(Passenger_Boardings),
+    total_alighting = sum(Passenger_Alightings)
+  )
+
+```
+
+```{r}
+od_records <- list()
+entry_counter <- 0  # 添加一个调试计数器
+
+for (train in train_ids) {
+  df <- filtered_data %>% filter(Train_Number == train)
+  if (nrow(df) < 2) next
+  onboard_stack <- c()
+
+  for (i in 1:nrow(df)) {
+    station <- df$Station_Name[i]
+    board <- df$Passenger_Boardings[i]
+    alight <- df$Passenger_Alightings[i]
+
+    if (board > 0) {
+      onboard_stack <- c(onboard_stack, rep(station, board))
+    }
+
+    if (alight > 0 && length(onboard_stack) > 0) {
+      actual_alight <- min(alight, length(onboard_stack))
+      from_stations <- onboard_stack[1:actual_alight]
+      onboard_stack <- onboard_stack[-(1:actual_alight)]
+
+      od_this_stop <- tibble(
+        From = from_stations,
+        To = rep(station, actual_alight)
+      )
+
+      od_records[[length(od_records) + 1]] <- od_this_stop
+      entry_counter <- entry_counter + nrow(od_this_stop)
+    }
+  }
+}
+
+print(paste("总共成功记录的OD条数为：", entry_counter))
+
+```
+```{r}
+train_ids <- filtered_data %>%
+  group_by(Train_Number) %>%
+  summarise(tot_board = sum(Passenger_Boardings),
+            tot_alight = sum(Passenger_Alightings)) %>%
+  filter(tot_board > 0, tot_alight > 0) %>%
+  pull(Train_Number) %>%
+  head(200)
+
+train_ids
+```
+
+#### 可以跑但是很慢
+
+```{r}
+library(dplyr)
+library(tidyr)
+library(chorddiag)
+
+city_loop_stations <- c("Flagstaff", "Melbourne Central", "Parliament", "Flinders Street", "Richmond", "Southern Cross")
+
+filtered_data <- Passenger_Dataset %>%
+  filter(Station_Name %in% city_loop_stations) %>%
+  mutate(Station_Name = as.character(Station_Name)) %>%   # 强制字符型
+  select(Train_Number, Stop_Sequence_Number, Station_Name,
+         Passenger_Boardings, Passenger_Alightings) %>%
+  arrange(Train_Number, Stop_Sequence_Number)
+
+# 只取真正有上下车的前200辆车
+train_ids <- filtered_data %>%
+  group_by(Train_Number) %>%
+  summarise(tot_board = sum(Passenger_Boardings),
+            tot_alight = sum(Passenger_Alightings)) %>%
+  filter(tot_board > 0, tot_alight > 0) %>%
+  pull(Train_Number) # %>%
+  # head(200)
+
+# 模拟
+od_records <- list()
+for (train in train_ids) {
+  df <- filtered_data %>% filter(Train_Number == train)
+  if (nrow(df) < 2) next
+  onboard_stack <- c()
+  for (i in 1:nrow(df)) {
+    station <- df$Station_Name[i]
+    board <- df$Passenger_Boardings[i]
+    alight <- df$Passenger_Alightings[i]
+    if (board > 0) onboard_stack <- c(onboard_stack, rep(station, board))
+    if (alight > 0 && length(onboard_stack) > 0) {
+      actual_alight <- min(alight, length(onboard_stack))
+      from_stations <- onboard_stack[1:actual_alight]
+      onboard_stack <- onboard_stack[-(1:actual_alight)]
+      od_this_stop <- tibble(From = from_stations, To = rep(station, actual_alight))
+      od_records[[length(od_records) + 1]] <- od_this_stop
+    }
+  }
+}
+
+od_all <- bind_rows(od_records)
+
+# 只保留六站之间 OD
+od_filtered <- od_all %>%
+  filter(From %in% city_loop_stations,
+         To %in% city_loop_stations,
+         From != To)
+
+# 构建完整 6x6 矩阵（防止列名缺失）
+od_matrix_df <- od_filtered %>%
+  count(From, To) %>%
+  mutate(From = as.character(From), To = as.character(To)) %>%
+  pivot_wider(names_from = To, values_from = n, values_fill = 0) %>%
+  complete(From = city_loop_stations) %>%  # 保证行齐
+  replace(is.na(.), 0)                     # 填补空值
+
+# 补齐缺失列
+missing_cols <- setdiff(city_loop_stations, colnames(od_matrix_df))
+for (col in missing_cols) {
+  od_matrix_df[[col]] <- 0
+}
+
+# 重新排列列顺序
+od_matrix_df <- od_matrix_df %>%
+  select(From, all_of(city_loop_stations)) %>%
+  arrange(factor(From, levels = city_loop_stations))
+
+# 转换为矩阵
+od_matrix <- od_matrix_df %>%
+  column_to_rownames("From") %>%
+  as.matrix()
+
+# 可视化
+group_colors <- c("#1b9e77", "#d95f02", "#7570b3", "#e7298a", "#66a61e", "#e6ab02")
+
+chorddiag(od_matrix,
+          groupColors = group_colors,
+          groupnamePadding = 20,
+          margin = 90)
+
+```
+
+```{r}
+od_matrix
+
+write.csv(od_matrix, "data/page_2.2_cityloop_od_matrix.csv")
+```
+
+
+```{r}
+# 1. 读取 CSV 文件
+od_df <- read.csv("data/page_2.2_cityloop_od_matrix.csv", row.names = 1, check.names = FALSE)
+
+# 2. 清洗列名（防止重复）
+colnames(od_df) <- trimws(colnames(od_df))
+rownames(od_df) <- trimws(rownames(od_df))
+
+# 3. 转为矩阵
+od_matrix <- as.matrix(od_df)
+
+# 7. 重新排序（可选）
+custom_order <- c("Flagstaff", "Southern Cross", "Melbourne Central", "Parliament", "Richmond", "Flinders Street")
+od_matrix <- od_matrix[custom_order, custom_order]
+
+od_matrix
+```
+
+####Shiny版代码
+
+```{r}
+# 1. 读取 CSV 文件
+od_df <- read.csv("data/page_2.2_cityloop_od_matrix.csv", row.names = 1, check.names = FALSE)
+
+# 2. 清洗列名（防止重复）
+colnames(od_df) <- trimws(colnames(od_df))
+rownames(od_df) <- trimws(rownames(od_df))
+
+# 3. 转为矩阵
+od_matrix <- as.matrix(od_df)
+
+# 7. 重新排序（可选）
+custom_order <- c("Flagstaff", "Southern Cross", "Melbourne Central", "Parliament", "Richmond", "Flinders Street")
+od_matrix <- od_matrix[custom_order, custom_order]
+
+# group_colors <- c("#F26223", "#7570b3", "#e7298a", "#957244", "#000000", "#FFDD89")
+
+chorddiag(od_matrix,
+          # groupColors = group_colors,
+          palette = "Set3",
+          tooltipUnit = " people",
+          tickInterval = 200000,
+          ticklabelFontsize = 8,
+          groupnameFontsize = 15,
+          groupnamePadding = 10,
+          margin = 85)
+```
+
+##Page 2.3
+###原图
+
+####读取Station_Dataset文件
+```{r}
+library(sf)
+Station_Dataset <- st_read("data/public_transport_stops_edited.geojson")
+
+Station_Dataset %>% as_tibble()
+plot(Station_Dataset["N_Metro_Platform"])   # 不同交通模式的站点
+
+Station_Dataset %>% summary()
+Station_Dataset
+```
+
+####读取 Passenger_Dataset文件
+```{r}
+library(tidyverse)
+
+col_spec <- cols(
+  Business_Date = col_date(format = ""),
+  Day_of_Week = col_factor(
+    levels = c("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"),
+    ordered = TRUE
+  ),
+  Day_Type = col_factor(),
+  # Mode = col_factor(),
+  Train_Number = col_character(),
+  Line_Name = col_factor(),
+  # Group = col_factor(),
+  Direction = col_factor(),
+  Origin_Station = col_factor(),
+  Destination_Station = col_factor(),
+  Station_Name = col_factor(),
+  Station_Latitude = col_double(),
+  Station_Longitude = col_double(),
+  Station_Chainage = col_integer(),
+  Stop_Sequence_Number = col_integer(),
+  Arrival_Time_Scheduled = col_time(format = ""),
+  Departure_Time_Scheduled = col_time(format = ""),
+  Passenger_Boardings = col_integer(),
+  Passenger_Alightings = col_integer(),
+  Passenger_Arrival_Load = col_integer(),
+  Passenger_Departure_Load = col_integer()
+)
+
+Passenger_Dataset <- read_csv(
+  "data/train_service_passenger_counts_fy_2023_2024_edited.csv",
+  col_types = col_spec
+)
+
+# 1. 生成 Time Bin 列
+Passenger_Dataset <- Passenger_Dataset %>%
+  mutate(Arrival_Hour_Scheduled = hour(hms(Arrival_Time_Scheduled))) %>% 
+  mutate(
+    Time_Bin = case_when(
+      Arrival_Hour_Scheduled < 4  ~ "00:00–04:00",
+      Arrival_Hour_Scheduled < 8  ~ "04:00–08:00",
+      Arrival_Hour_Scheduled < 12 ~ "08:00–12:00",
+      Arrival_Hour_Scheduled < 16 ~ "12:00–16:00",
+      Arrival_Hour_Scheduled < 20 ~ "16:00–20:00",
+      TRUE                        ~ "20:00–00:00"
+    ),
+    Day_Type = case_when(
+      Day_Type %in% c("Saturday", "Sunday") ~ "Normal Weekend",
+      TRUE ~ Day_Type
+    )
+  )
+
+Passenger_Dataset
+```
+
+####数据预处理
+```{r}
+# 1. 计算每个车站每一天的人流量（上下车合计）
+df_station_daily <- Passenger_Dataset %>%
+  group_by(Station_Name, Business_Date) %>%
+  summarise(
+    total_volume = sum(Passenger_Boardings + Passenger_Alightings, na.rm = TRUE),
+    total_trains = n_distinct(Train_Number),
+    .groups = "drop"
+  )
+
+# 2. 平均每天人流和列车数
+df_station_summary <- df_station_daily %>%
+  group_by(Station_Name) %>%
+  summarise(
+    daily_volume = mean(total_volume),
+    daily_trains = mean(total_trains),
+    .groups = "drop"
+  )
+
+# 3. 计算 peak_volume：weekday 且 16:00–20:00 的平均人流
+df_peak <- Passenger_Dataset %>%
+  filter(Day_Type == "Normal Weekday", Time_Bin == "16:00–20:00") %>%
+  group_by(Station_Name) %>%
+  summarise(
+    peak_volume = mean(Passenger_Boardings + Passenger_Alightings, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+df_station_daily
+df_station_summary
+df_peak
+```
+
+```{r}
+# 合并所有信息
+Station_Stats <- Station_Dataset %>%
+  mutate(Station_Name = str_replace(Station_Name, " Station$", "")) %>% 
+  left_join(df_station_summary, by = "Station_Name") %>%
+  left_join(df_peak, by = "Station_Name") %>%
+  mutate(
+    per_platform_volume  = daily_volume / N_Metro_Platform,
+    per_platform_trains  = daily_trains / N_Metro_Platform,
+    per_train_volume     = daily_volume / daily_trains
+  ) %>% 
+  filter(!is.na(daily_volume))
+
+Station_Stats %>% as_tibble()
+
+Station_Stats %>% summary()
+```
+
+```{r}
+Station_Stats <- Station_Stats %>%
+  mutate(
+    norm_peak_volume = (peak_volume - min(peak_volume, na.rm = TRUE)) / 
+                       (max(peak_volume, na.rm = TRUE) - min(peak_volume, na.rm = TRUE)),
+    norm_per_platform_volume = (per_platform_volume - min(per_platform_volume, na.rm = TRUE)) / 
+                               (max(per_platform_volume, na.rm = TRUE) - min(per_platform_volume, na.rm = TRUE)),
+    norm_per_platform_trains = (per_platform_trains - min(per_platform_trains, na.rm = TRUE)) / 
+                               (max(per_platform_trains, na.rm = TRUE) - min(per_platform_trains, na.rm = TRUE)),
+    norm_per_train_volume = (per_train_volume - min(per_train_volume, na.rm = TRUE)) / 
+                            (max(per_train_volume, na.rm = TRUE) - min(per_train_volume, na.rm = TRUE))
+  ) %>%
+  rowwise() %>%
+  mutate(
+    Crowding_Index = mean(c_across(starts_with("norm_")), na.rm = TRUE)
+  ) %>%
+  ungroup()
+
+Station_Stats %>% arrange(desc(Crowding_Index))
+```
+
+```{r}
+# Station_Stats_Copy <- Station_Stats %>% select(-geometry) %>% as_tibble()
+# write_csv(Station_Stats_Copy, "data/page_2.3_2.4_station_stats.csv")
+st_write(Station_Stats, "data/page_2.3_2.4_station_stats.geojson", driver = "GeoJSON")
+Station_Stats %>% select(Station_Name, norm_peak_volume, norm_per_platform_volume, norm_per_platform_trains, norm_per_train_volume)
+```
+
+####画图
+
+```{r}
+# 加载包
+library(fmsb)
+library(RColorBrewer)
+library(scales)
+library(dplyr)
+
+Station_Stats <- st_read("data/page_2.3_2.4_station_stats.geojson")
+
+# 选择 Crowding_Index 前三名车站
+top3 <- Station_Stats %>%
+  arrange(desc(Crowding_Index)) %>%
+  slice(1:3) %>%
+  st_drop_geometry() %>%  # 👈 去掉 geometry
+  select(
+    Station_Name,
+    norm_peak_volume,
+    norm_per_platform_volume,
+    norm_per_platform_trains,
+    norm_per_train_volume
+  )
+
+# 设置行名为 Station_Name
+radar_data <- as.data.frame(top3[,-1])
+rownames(radar_data) <- top3$Station_Name
+
+# 添加 max 和 min 两行（fmsb 要求）
+radar_data <- rbind(rep(1, 4), rep(0, 4), radar_data)
+
+# 设置颜色
+coul <- brewer.pal(3, "BuPu")
+colors_border <- coul
+colors_in <- alpha(coul, 0.3)
+```
+
+```{r}
+# 设置保存文件路径和尺寸
+# png(filename = "../plot/figure_2_3.png", width = 800, height = 600, res = 200)
+
+colnames(radar_data) <- c(
+  "Peak Hour Volume",
+  "Passenger\nVolume\nper Platform",
+  "Train Count per Platform",
+  "Passenger\nVolume\nper Train"
+)
+
+# 设置布局：1 行 2 列，宽度比例 3:1
+
+# 左侧绘制雷达图
+par(family = "serif")
+
+radarchart(radar_data[-c(1,2),], axistype = 0, maxmin = FALSE,
+           pcol = colors_border,
+           pfcol = colors_in,
+           plwd = 4,
+           plty = 1,
+           cglcol = "grey", cglty = 1, axislabcol = "black", cglwd = 0.8,
+           vlcex = 0.8)
+
+# 使用 mtext 放标题（左上角）
+mtext("Crowding Dimensions of the Top 3 Stations", 
+      side = 3, line = 1, adj = 0.5,
+      font = 2, cex = 1.2, family = "serif")
+
+# 右侧绘制图例
+legend(# "center",
+       x = 0.6, y = 1,
+       legend = rownames(radar_data[-c(1, 2),]),
+       bty = "n",
+       pch = 20,
+       col = colors_border,
+       pt.bg = colors_in,
+       text.col = "gray30",
+       cex = 0.9,
+       pt.cex = 2.5)
+
+# 结束并保存
+# dev.off()
+```
+
+###模板
+```{r}
+library(ggradar)
+library(palmerpenguins)
+library(tidyverse)
+library(scales)
+library(showtext)
+
+font_add_google("Lobster Two", "lobstertwo")
+font_add_google("Roboto", "roboto")
+
+# Showtext will be automatically invoked when needed
+showtext_auto()
+
+data("penguins", package = "palmerpenguins")
+head(penguins, 3)
+
+penguins_radar <- penguins %>%
+  drop_na() %>%
+  group_by(species) %>%
+  summarise(
+    avg_bill_length = mean(bill_length_mm),
+    avg_bill_dept = mean(bill_depth_mm),
+    avg_flipper_length = mean(flipper_length_mm),
+    avg_body_mass = mean(body_mass_g)
+  ) %>%
+  ungroup() %>%
+  mutate_at(vars(-species), rescale)
+
+plt <- penguins_radar %>%
+  ggradar(
+    font.radar = "roboto",
+    grid.label.size = 13,  # Affects the grid annotations (0%, 50%, etc.)
+    axis.label.size = 8.5, # Afftects the names of the variables
+    group.point.size = 3   # Simply the size of the point 
+  )
+
+# 1. Set the position legend to bottom-right
+# 2. Bottom-right justification
+# 3. Customize text size and family
+# 4. Remove background and border color for the keys
+# 5. Remove legend background
+plt <- plt + 
+  theme(
+    legend.position = c(1, 0),  
+    legend.justification = c(1, 0),
+    legend.text = element_text(size = 28, family = "roboto"),
+    legend.key = element_rect(fill = NA, color = NA),
+    legend.background = element_blank()
+  )
+
+# * The panel is the drawing region, contained within the plot region.
+#   panel.background refers to the plotting area
+#   plot.background refers to the entire plot
+plt <- plt + 
+  labs(title = "Radar plot of penguins species") + 
+  theme(
+      plot.background = element_rect(fill = "#fbf9f4", color = "#fbf9f4"),
+      panel.background = element_rect(fill = "#fbf9f4", color = "#fbf9f4"),
+      plot.title.position = "plot", # slightly different from default
+      plot.title = element_text(
+        family = "lobstertwo", 
+        size = 62,
+        face = "bold", 
+        color = "#2a475e"
+    )
+  )
+
+plt
+# ggsave(
+#   filename = here::here("img", "fromTheWeb", "HtmlWidget/web-radar-chart-with-R.png"),
+#   plot = plt,
+#   width = 5.7,
+#   height = 5,
+#   device = "png"
+# )
+```
+
+
+###Shiny版
+
+```{r}
+# ---- 0. 准备 ----
+# 安装包（如未安装）
+# install.packages(c("tidyverse", "sf", "ggiraphExtra", "showtext", "ggradar", "scales"))
+library(tidyverse)
+library(sf)
+library(ggradar)
+library(scales)
+library(showtext)
+
+# 字体设置：使用 roboto 替代原模板中的 Lobster Two（更现代、清晰）
+font_add_google("Roboto", "roboto")
+showtext_auto()
+
+# ---- 1. 读取数据 ----
+Station_Stats <- st_read("data/page_2.3_2.4_station_stats.geojson")
+
+# ---- 2. 提取 Crowding_Index 前三名车站 ----
+top3 <- Station_Stats %>%
+  arrange(desc(Crowding_Index)) %>%
+  slice(1:3) %>%
+  st_drop_geometry() %>%
+  select(
+    Station_Name,
+    `Peak Hour Volume` = norm_peak_volume,
+    `Passenger Volume\nper Platform` = norm_per_platform_volume,
+    `Train Count per Platform` = norm_per_platform_trains,
+    `Passenger Volume\nper Train` = norm_per_train_volume
+  )
+
+# ---- 3. 标准化数据格式供 ggradar 使用 ----
+radar_data <- top3 %>%
+  mutate(across(-Station_Name, rescale)) %>%
+  rename(group = Station_Name)  # ggradar要求第一列叫group
+
+# ---- 4. 生成图表 ----
+plt <- radar_data %>%
+  ggradar(
+    font.radar = "roboto",
+    grid.label.size = 5,
+    axis.label.size = 5,
+    group.point.size = 3,
+    group.line.width = 1.8,
+    group.colours = c("#F8766D", "#FDCB6E", "#00B894"),
+    # group.colours = RColorBrewer::brewer.pal(3, "BuPu"),
+    fill.alpha = 0.25
+  )
+
+# ---- 5. 主题设置 ----
+plt <- plt +
+  labs(title = "Crowding Dimensions of the Top 3 Stations") +
+  coord_equal(clip = "off") +
+  theme(
+    text = element_text(family = "roboto"),
+    # plot.background = element_rect(fill = "#fbf9f4", color = "#fbf9f4"),
+    # panel.background = element_rect(fill = "#fbf9f4", color = "#fbf9f4"),
+    plot.title.position = "plot", # slightly different from default
+    # legend.position = c(1.4, 0.32),
+    legend.position = c(1.23, 0),
+    legend.justification = c(1, 0),
+    legend.text = element_text(size = 15, family = "roboto"),
+    legend.key = element_rect(fill = NA, color = NA),
+    legend.background = element_blank(),
+    plot.title = element_text(size = 20, face = "bold", color = "#2a475e", hjust = 0),
+    # margin = margin(l = -10)
+    # plot.margin = margin(t = 10, r = 40, b = 10, l = 40, unit = "pt")  # ⬅️ 关键：手动扩大左右边距
+  )
+
+# ---- 6. 输出图表 ----
+print(plt)
+
+```
+
+###第二版
+
+```{r}
+# ---- 0. 准备 ----
+# 安装包（如未安装）
+# install.packages(c("tidyverse", "sf", "ggiraphExtra", "showtext", "ggradar", "scales"))
+library(tidyverse)
+library(sf)
+library(ggradar)
+library(scales)
+library(showtext)
+library(ggtext)
+
+# 字体设置：使用 roboto 替代原模板中的 Lobster Two（更现代、清晰）
+font_add_google("Roboto", "roboto")
+showtext_auto()
+
+# ---- 1. 读取数据 ----
+Station_Stats <- st_read("data/page_2.3_2.4_station_stats.geojson")
+
+# ---- 2. 提取 Crowding_Index 前三名车站 ----
+top3 <- Station_Stats %>%
+  arrange(desc(Crowding_Index)) %>%
+  slice(1:3) %>%
+  st_drop_geometry() %>%
+  select(
+    Station_Name,
+    `Peak Hour Volume` = norm_peak_volume,
+    `Passenger Volume\nper Platform` = norm_per_platform_volume,
+    `Train Count per Platform` = norm_per_platform_trains,
+    `Passenger Volume\nper Train` = norm_per_train_volume
+  )
+
+# ---- 3. 标准化数据格式供 ggradar 使用 ----
+radar_data <- top3 %>%
+  mutate(across(-Station_Name, rescale)) %>%
+  rename(group = Station_Name)  # ggradar要求第一列叫group
+
+# ---- 4. 生成图表 ----
+plt <- radar_data %>%
+  ggradar(
+    font.radar = "roboto",
+    grid.label.size = 5,
+    axis.label.size = 5,
+    group.point.size = 3,
+    group.line.width = 1.8,
+    group.colours = c("#F8766D", "#FDCB6E", "#00B894"),
+    # group.colours = RColorBrewer::brewer.pal(3, "BuPu"),
+    fill.alpha = 0.25
+  )
+
+# ---- 5. 主题设置 ----
+plt <- plt +
+  labs(title = "Crowding Dimensions of the Top 3 Stations") +
+  coord_equal(clip = "off") +
+  theme(
+    text = element_text(family = "roboto"),
+    plot.title.position = "plot",
+    plot.title = element_textbox_simple(
+      size = 20,
+      face = "bold",
+      color = "#2a475e",
+      hjust = 0,
+      margin = margin(l = -26, unit = "pt"),
+      width = unit(1, "npc")
+    ),
+    legend.position = c(1.2, 0),
+    legend.justification = c(1, 0),
+    # legend.position = c(1.6, 0.5),        # 右侧 + 垂直居中
+    # legend.justification = c(1, 0.5),      # 锚点也设置成居中
+    legend.text = element_text(size = 15, family = "roboto"),
+    legend.key = element_rect(fill = NA, color = NA),
+    legend.background = element_blank()
+  )
+
+# ---- 6. 输出图表 ----
+print(plt)
+```
+
+## Page 2.4
+
+###原图
+
+#### 导入station_stats
+
+```{r}
+library(tidyverse)
+library(sf)
+# library(ggradar)
+# library(scales)
+# library(showtext)
+# library(ggtext)
+
+# 字体设置：使用 roboto 替代原模板中的 Lobster Two（更现代、清晰）
+# font_add_google("Roboto", "roboto")
+# showtext_auto()
+
+# ---- 1. 读取数据 ----
+Station_Stats <- st_read("data/page_2.3_2.4_station_stats.geojson")
+Station_Stats %>% arrange(desc(Crowding_Index)) %>% as_tibble()
+```
+
+#### 导入火车线路数据与预处理
+
+```{r}
+# Line_Dataset <- st_read("data/public_transport_lines_edited.geojson")
+# Line_Dataset %>% as_tibble()
+# 
+# Line_Dataset <- Line_Dataset %>%
+#   group_by(SHORT_NAME) %>%
+#   summarise(geometry = first(geometry), .groups = "drop") %>%
+#   st_as_sf() %>% 
+#   filter(!SHORT_NAME == "Stony Point")
+# 
+# st_write(Line_Dataset, "data/page_2.4_train_lines_reference.geojson", driver = "GeoJSON")
+
+Line_Dataset <- st_read("data/page_2.4_train_lines_reference.geojson")
+Line_Dataset %>% as_tibble()
+```
+
+####预处理
+
+```{r}
+library(lwgeom)
+
+# 提取每条线路 geometry 的末端点
+Line_Labels <- Line_Dataset %>%
+  mutate(
+    end_point = st_startpoint(geometry)  # 提取每条 LINESTRING 的末端坐标
+  ) %>%
+  st_set_geometry("end_point") %>%  # 将末端点作为新的 sf 对象 geometry
+  filter(!SHORT_NAME %in% c("Flemington Racecourse", "City Circle"))
+
+Line_Labels %>% as_tibble()
+```
+
+####制图
+
+```{r}
+# library(ggplot2)
+# library(sf)
+library(viridis)  # 更好看的连续色带
+# library(lwgeom)   # 每次使用前加载
+
+ggplot(Station_Stats) +
+  geom_sf(data = Line_Dataset, color = "gray40", size = 0.8) +
+  # geom_sf(aes(geometry = geometry, color = Crowding_Index), size = 2) +
+  geom_sf(aes(geometry = geometry, color = Crowding_Index, size = Crowding_Index)) +
+  # 线路标签
+  geom_sf_text(
+    data = Line_Labels,
+    aes(label = SHORT_NAME),
+    size = 3.5,
+    color = "gray20",
+    # fontface = "bold",
+    family = "serif",
+    check_overlap = TRUE
+  ) +
+  scale_color_viridis(
+    name = "Crowding Index",
+    option = "inferno",  # 你也可以试试 "magma", "plasma", "viridis"
+    direction = -1
+  ) +
+  scale_size_continuous(name = "Crowding Index") +
+  labs(
+    title = "Station Crowding Index across the Network",
+    subtitle = "Based on Passenger Flow Volumn, Platform Count, and Train Service Intensity"
+  ) +
+  theme_minimal(base_family = "serif") +
+  theme(
+    plot.title = element_text(size = 14, face = "bold"),
+    plot.subtitle = element_text(size = 10),
+    legend.title = element_text(size = 10),
+    legend.text = element_text(size = 9),
+    axis.title = element_blank(),      # 移除 X 和 Y 轴标题
+    axis.text = element_blank(),       # 移除坐标刻度标签
+    axis.ticks = element_blank(),      # 移除坐标刻度
+    panel.grid = element_blank()       # 移除背景网格
+  )
+```
+
+### leadlet版本
+####导入数据
+```{r}
+library(tidyverse)
+library(sf)
+library(leaflet)
+library(viridis)
+library(lwgeom)
+
+Station_Stats <- st_read("data/page_2.4_station_stats_with_station_type.geojson")
+Line_Dataset <- st_read("data/page_2.4_train_lines_reference.geojson")
+
+# 提取每条线路 geometry 的末端点
+Line_Labels <- Line_Dataset %>%
+  mutate(
+    end_point = st_startpoint(geometry)  # 提取每条 LINESTRING 的末端坐标
+  ) %>%
+  st_set_geometry("end_point") %>%  # 将末端点作为新的 sf 对象 geometry
+  filter(!SHORT_NAME %in% c("Flemington Racecourse", "City Circle"))
+
+Line_Labels_coords <- Line_Labels %>%
+  mutate(lon = st_coordinates(end_point)[,1],
+         lat = st_coordinates(end_point)[,2]) %>%
+  st_drop_geometry()
+```
+
+#### 存储标签数据
+
+```{r}
+library(sf)
+library(dplyr)
+
+Line_Dataset <- st_read("data/page_2.4_train_lines_reference.geojson", quiet = TRUE)
+
+Line_Labels <- Line_Dataset %>%
+  mutate(
+    end_point = st_startpoint(geometry)  # 取终点坐标作为 label point
+  ) %>%
+  st_set_geometry("end_point") %>%
+  filter(!SHORT_NAME %in% c("Flemington Racecourse", "City Circle"))
+
+saveRDS(Line_Labels, "data/page_2.4_train_line_labels.rds")
+
+Line_Labels <- readRDS("data/page_2.4_train_line_labels.rds")
+Line_Labels
+```
+
+
+####批量雷达图***
+```{r}
+library(ggradar)
+library(dplyr)
+library(scales)
+library(ggplot2)
+library(ggtext)
+
+# 读入数据
+# stats_data <- readr::read_csv("data/page_2.3_2.4_station_stats_flat.csv")  # st_drop_geometry后的结果
+stats_data <- st_read("data/page_2.3_2.4_station_stats.geojson", quiet = TRUE) %>%
+    st_drop_geometry()
+station_list <- stats_data$Station_Name
+
+# 中位站
+ref_station <- stats_data %>%
+  arrange(Crowding_Index) %>%
+  slice(ceiling(n() / 2))
+
+ref_row <- ref_station %>%
+  mutate(group = "Median SCI") %>%
+  select(
+    group,
+    `Peak Hour Volume` = norm_peak_volume,
+    `Pax\nper Platform` = norm_per_platform_volume,
+    `Train Count per Platform` = norm_per_platform_trains,
+    `Pax\nper Train` = norm_per_train_volume
+  )
+
+# 创建 radar_png 文件夹
+dir.create("www/radar_png", showWarnings = FALSE)
+
+for (station in station_list) {
+  target_row <- stats_data %>%
+    filter(Station_Name == station) %>%
+    mutate(group = Station_Name) %>%
+    select(
+      group,
+      `Peak Hour Volume` = norm_peak_volume,
+      `Pax\nper Platform` = norm_per_platform_volume,
+      `Train Count per Platform` = norm_per_platform_trains,
+      `Pax\nper Train` = norm_per_train_volume
+    )
+  
+  plot_data <- bind_rows(target_row, ref_row) %>%
+    mutate(group = factor(group, levels = c(station, "Median SCI")))  # 🚨 强制颜色顺序
+
+  # 绘图
+  radar_plot <- ggradar(
+    # plot_data,
+    # font.radar = "roboto",
+    # axis.label.size = 4,
+    # grid.label.size = 4,
+    #   group.point.size = 3,
+    # group.line.width = 1.5,
+    # group.colours = c("#e74c3c", "gray60"),
+    # fill.alpha = 0.25
+    
+    plot_data,
+    font.radar = "roboto",
+    grid.label.size = 6,
+    axis.label.size = 6,
+    group.point.size = 3,
+    group.line.width = 2.5,
+    group.colours = c("#e74c3c", "gray60"),
+    fill.alpha = 0.25
+  ) +
+    labs(title = station) +
+    theme(text = element_text(family = "roboto"),
+          plot.title = element_blank(),
+          legend.position = c(1, 0),
+          legend.justification = c(1, 0),
+          legend.text = element_text(size = 16)
+    )
+
+  # 导出为 PNG
+  ggsave(
+    filename = paste0("www/radar_png/", gsub(" ", "_", station), ".png"),
+    plot = radar_plot,
+    width = 8,
+    height = 6,
+    dpi = 100
+  )
+}
+
+```
+
+####添加车站类型
+```{r}
+station_line_counts <- Passenger_Dataset %>%
+  distinct(Station_Name, Line_Name) %>%
+  group_by(Station_Name) %>%
+  summarise(N_Lines = n(), .groups = "drop")  # 每个车站所覆盖的线路数
+
+# station_line_counts %>% arrange(desc(N_Lines))
+
+# 终点站列表（硬编码）
+terminus_stations <- c(
+  "Sunbury", "Glen Waverley", "Belgrave", "Alamein", "Lilydale", "Pakenham",
+  "Cranbourne", "Hurstbridge", "Frankston", "Upfield", "Mernda", "Craigieburn",
+  "Werribee", "Sandringham", "Williamstown"
+)
+
+Station_Stats <- Station_Stats %>%
+  left_join(station_line_counts, by = "Station_Name") %>%
+  mutate(
+    N_Lines = replace_na(N_Lines, 1),
+    is_terminus = Station_Name %in% terminus_stations,
+    Station_Type = case_when(
+      is_terminus ~ "Terminal Station",
+      N_Lines == 1 ~ "Single-Line Station",
+      N_Lines > 1 ~ "Multi-Line Station"
+    )
+  )
+
+st_write(Station_Stats, "data/page_2.4_station_stats_with_station_type.geojson", driver = "GeoJSON")
+Station_Stats %>% as_tibble()
+```
+
+####制图
+
+```{r}
+# 制图
+library(htmlwidgets)
+
+# 计算初始地图中心和缩放（你可以手动设定）
+init_lon <- 144.9631  # Melbourne
+init_lat <- -37.8136
+init_zoom <- 12
+
+# 设置颜色映射和大小映射
+pal <- colorNumeric(palette = "inferno", domain = Station_Stats$Crowding_Index, reverse = TRUE)
+
+map_obj <- leaflet() %>%
+  addProviderTiles("CartoDB.Positron") %>%
+  setView(lng = init_lon, lat = init_lat, zoom = init_zoom) %>%  # 墨尔本中心点
+  
+  # 加入灰色线路
+  addPolylines(data = Line_Dataset,
+               color = "grey",
+               weight = 2,
+               opacity = 1,
+               group = "Train Lines") %>%
+  
+  addCircleMarkers(
+    data = Station_Stats,
+    color = ~pal(Crowding_Index),
+    # radius = ~scales::rescale(Crowding_Index, to = c(4, 10)),
+    radius = ~scales::rescale(N_Lines, to = c(6, 12)),  # 根据线路数设置大小
+    fillOpacity = 1,
+    stroke = FALSE,
+    popup = ~paste0(
+        "<div style='font-size:16px; font-weight:bold;'>", Station_Name, " Station", "</div>",
+        "<div style='font-size:13px;'>",
+        "<table style='border-collapse: collapse;'>",
+          "<tr><td style='font-weight:bold; padding-right:8px;'>Crowding Index:</td><td>", round(Crowding_Index, 3), "</td></tr>",
+          "<tr><td style='font-weight:bold; padding-right:8px;'>Metro Platforms:</td><td>", N_Metro_Platform, "</td></tr>",
+          "<tr><td style='font-weight:bold; padding-right:8px;'>Lines Served:</td><td>", N_Lines, "</td></tr>",
+          "<tr><td style='font-weight:bold; padding-right:8px;'>Station Type:</td><td>", Station_Type, "</td></tr>",
+        "</table>",
+  "</div>",
+        "<img src='radar_png/", gsub(" ", "_", Station_Name), ".png' width='300px'>"
+    ),
+  ) %>% 
+
+  
+  # 添加线路终点的标签
+  addLabelOnlyMarkers(data = Line_Labels_coords,
+                      lng = ~lon,
+                      lat = ~lat,
+                      label = ~SHORT_NAME,
+                      labelOptions = labelOptions(
+                        noHide = TRUE,
+                        direction = "auto",
+                        textOnly = TRUE,
+                        style = list(
+                          "color" = "gray20",
+                          "font-family" = "sans serif",
+                          "font-size" = "10px"
+                        )
+                      )) %>%
+  
+  # 添加图例
+  addLegend("bottomright",
+            pal = pal,
+            values = Station_Stats$Crowding_Index,
+            title = "SCI",
+            opacity = 0.8) %>% 
+  
+    # 添加刷新按钮
+  addEasyButton(easyButton(
+    icon = "fa-rotate-right",  # 刷新图标
+    title = "Reset Map",
+    onClick = JS(glue::glue("
+      function(btn, map) {{
+        map.setView([{init_lat}, {init_lon}], {init_zoom});
+      }}
+    "))
+  )) 
+
+# 保存为 HTML 文件
+saveWidget(map_obj, file = "HtmlWidget/page_2.4_map.html", selfcontained = TRUE)
+```
+
+
+###雷达图版本（作废）
+####导入数据
+```{r}
+library(tidyverse)
+library(sf)
+library(leaflet)
+library(viridis)
+library(lwgeom)
+
+Station_Stats <- st_read("data/page_2.3_2.4_station_stats.geojson")
+Line_Dataset <- st_read("data/page_2.4_train_lines_reference.geojson")
+
+# 提取每条线路 geometry 的末端点
+Line_Labels <- Line_Dataset %>%
+  mutate(
+    end_point = st_startpoint(geometry)  # 提取每条 LINESTRING 的末端坐标
+  ) %>%
+  st_set_geometry("end_point") %>%  # 将末端点作为新的 sf 对象 geometry
+  filter(!SHORT_NAME %in% c("Flemington Racecourse", "City Circle"))
+
+Line_Labels_coords <- Line_Labels %>%
+  mutate(lon = st_coordinates(end_point)[,1],
+         lat = st_coordinates(end_point)[,2]) %>%
+  st_drop_geometry()
+```
+
+```{r}
+
+```
+
+
+####制图
+```{r}
+# 确保安装必要包
+# install.packages(c("leaflet", "base64enc", "magick"))
+
+library(leaflet)
+library(base64enc)
+library(htmltools)
+
+# 创建 Base64 图片编码函数
+img_to_base64 <- function(path, max_width = 300) {
+  if (!file.exists(path)) return("")
+  paste0(
+    "data:image/png;base64,",
+    base64encode(path)
+  )
+}
+
+# 准备图片数据
+Station_Stats$img_base64 <- sapply(Station_Stats$Station_Name, function(name) {
+  safe_name <- gsub(" ", "_", name)
+  img_path <- file.path("radar_png", paste0(safe_name, ".png"))
+  img_to_base64(img_path)
+})
+
+# 在创建地图之前添加CSS覆盖
+htmltools::tags$head(
+  htmltools::tags$style(HTML("
+    .leaflet-popup-content-wrapper {
+      max-width: none !important;
+      width: auto !important;
+      border-radius: 8px;
+      box-shadow: 0 3px 10px rgba(0,0,0,0.2);
+    }
+    
+    .leaflet-popup-content {
+      width: 400px !important;
+      margin: 0 !important;
+      padding: 0 !important;
+    }
+    
+    .leaflet-popup-tip {
+      display: none; /* 可选：隐藏小三角 */
+    }
+  "))
+)
+
+# 创建地图
+map_obj <- leaflet() %>%
+  addProviderTiles("CartoDB.Positron") %>%
+  setView(lng = init_lon, lat = init_lat, zoom = init_zoom) %>%
+  addPolylines(data = Line_Dataset, color = "grey", weight = 2, opacity = 1) %>%
+  addCircleMarkers(
+    data = Station_Stats,
+    color = ~pal(Crowding_Index),
+    radius = ~scales::rescale(Crowding_Index, to = c(4, 10)),
+    fillOpacity = 1,
+    stroke = FALSE,
+    popup = ~sprintf(
+      "<div style='width:100%%; padding:12px; box-sizing:border-box; background-color:white;'>
+         <div style='margin-bottom:12px; border-bottom:1px solid #f0f0f0; padding-bottom:8px;'>
+           <div style='font-size:18px; font-weight:bold; margin-bottom:4px;'>%s</div>
+           <div style='font-size:14px; color:#666;'>Crowding Index: <b style='color:#e74c3c;'>%.3f</b></div>
+         </div>
+         <img src='%s' 
+              style='display:block; width:100%%; height:auto; border-radius:4px;'
+              onerror='this.onerror=null; this.src=\"data:image/svg+xml;charset=utf-8,<svg xmlns=&quot;http://www.w3.org/2000/svg&quot; viewBox=\\\"0 0 400 300\\\"><rect width=\\\"100%%\\\" height=\\\"100%%\\\" fill=\\\"#fafafa\\\"/><text x=\\\"50%%\\\" y=\\\"50%%\\\" font-family=\\\"Arial\\\" font-size=\\\"14\\\" fill=\\\"#999\\\" dominant-baseline=\\\"middle\\\" text-anchor=\\\"middle\\\">Image not available</text></svg>\";'>
+       </div>",
+      Station_Name,
+      Crowding_Index,
+      img_base64
+    )
+    # popup = ~sprintf(
+    #   "<div style='width:400px; padding:5px; box-sizing:border-box;'>
+    #     <div style='font-size:14px; margin-bottom:5px;'>
+    #       <b style='font-size:16px;'>%s</b><br>
+    #       Crowding Index: %.3f
+    #     </div>
+    #     <img src='%s' 
+    #          style='display:block; width:400px; height:auto; margin:0 auto;'
+    #          onerror='this.onerror=null; this.src=\"data:image/svg+xml;charset=utf-8,<svg xmlns=&quot;http://www.w3.org/2000/svg&quot; width=\\\"400\\\" height=\\\"300\\\"><rect width=\\\"100%%\\\" height=\\\"100%%\\\" fill=\\\"#f0f0f0\\\"/><text x=\\\"50%%\\\" y=\\\"50%%\\\" font-family=\\\"Arial\\\" font-size=\\\"14\\\" fill=\\\"gray\\\" dominant-baseline=\\\"middle\\\" text-anchor=\\\"middle\\\">Image not available</text></svg>\";'>
+    #   </div>",
+    #   Station_Name,
+    #   Crowding_Index,
+    #   img_base64
+    # )
+  ) %>%
+  # 添加线路终点的标签
+  addLabelOnlyMarkers(data = Line_Labels_coords,
+                      lng = ~lon,
+                      lat = ~lat,
+                      label = ~SHORT_NAME,
+                      labelOptions = labelOptions(
+                        noHide = TRUE,
+                        direction = "auto",
+                        textOnly = TRUE,
+                        style = list(
+                          "color" = "gray20",
+                          "font-family" = "sans serif",
+                          "font-size" = "10px"
+                        )
+                      )) %>%
+  
+  # 添加图例
+  addLegend("bottomright",
+            pal = pal,
+            values = Station_Stats$Crowding_Index,
+            title = "SCI",
+            opacity = 0.8) %>% 
+  
+    # 添加刷新按钮
+  addEasyButton(easyButton(
+    icon = "fa-rotate-right",  # 刷新图标
+    title = "Reset Map",
+    onClick = JS(glue::glue("
+      function(btn, map) {{
+        map.setView([{init_lat}, {init_lon}], {init_zoom});
+      }}
+    "))
+  ))
+
+# 保存为 HTML 文件
+saveWidget(map_obj, file = "HtmlWidget/page_2.4_map_with_radar.html", selfcontained = TRUE)
+```
+
+### Exploration Mode
+#### 数据预处理
+
+```{r}
+Passenger_Dataset
+```
+
+
+```{r}
+library(tidyverse)
+library(lubridate)
+
+# === Load datasets ===
+# Station_Dataset <- read_csv("data/Station_Dataset.csv")
+# Passenger_Dataset <- read_csv("data/Passenger_Dataset.csv")
+# station_line_counts <- read_rds("data/station_line_counts.rds")  # 或重新运行你那段代码
+
+# === Create time columns ===
+# Passenger_Dataset <- Passenger_Dataset %>%
+#   mutate(
+#     Hour = hour(hms(Scheduled_Time)),  # 提取小时
+#     Day_Type = factor(Day_Type)        # 确保为 factor
+#   )
+
+# === Peak volume by station and day type (16:00–20:00) ===
+df_peak <- Passenger_Dataset %>%
+  filter(Arrival_Hour_Scheduled >= 16, Arrival_Hour_Scheduled < 20) %>%
+  group_by(Station_Name, Day_Type) %>%
+  summarise(
+    peak_volume = mean(Passenger_Boardings + Passenger_Alightings, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+# === Hourly stats: volume + train count ===
+df_hourly <- Passenger_Dataset %>%
+  group_by(Station_Name, Day_Type, Arrival_Hour_Scheduled) %>%
+  summarise(
+    hourly_volume = sum(Passenger_Boardings + Passenger_Alightings, na.rm = TRUE),
+    hourly_trains = n_distinct(Train_Number),
+    .groups = "drop"
+  )
+
+# === Combine with static data: N_Platforms and N_Lines ===
+station_meta <- Station_Stats %>%
+  st_drop_geometry() %>% 
+  select(Station_Name, N_Metro_Platform, N_Lines) 
+  # mutate(Station_Name = str_replace(Station_Name, " Station$", ""))
+  # left_join(station_line_counts, by = "Station_Name")
+
+# 获取所有组合
+station_list <- unique(Passenger_Dataset$Station_Name)
+daytype_list <- levels(Passenger_Dataset$Day_Type)
+hour_list <- 0:23
+
+# 构建完整组合数据框
+full_grid <- expand.grid(
+  Station_Name = station_list,
+  Day_Type = daytype_list,
+  Arrival_Hour_Scheduled = hour_list
+)
+
+# 加入 df_hourly 中
+df_hourly_full <- full_grid %>%
+  left_join(df_hourly, by = c("Station_Name", "Day_Type", "Arrival_Hour_Scheduled"))
+
+# === Merge everything ===
+df_combined <- df_hourly_full %>%
+  left_join(df_peak, by = c("Station_Name", "Day_Type")) %>%
+  left_join(station_meta, by = "Station_Name") %>%
+  filter(!is.na(N_Metro_Platform), !is.na(N_Lines)) %>%
+  mutate(
+    per_platform_volume   = hourly_volume / N_Metro_Platform,
+    per_platform_trains   = hourly_trains / N_Metro_Platform,
+    per_train_volume      = hourly_volume / pmax(hourly_trains, 1)  # 防止除0
+  )
+
+# === Global normalisation (min-max across all rows) ===
+df_combined <- df_combined %>%
+  mutate(
+    norm_peak_volume = (peak_volume - min(peak_volume, na.rm = TRUE)) /
+                       (max(peak_volume, na.rm = TRUE) - min(peak_volume, na.rm = TRUE)),
+    
+    norm_per_platform_volume = (per_platform_volume - min(per_platform_volume, na.rm = TRUE)) /
+                               (max(per_platform_volume, na.rm = TRUE) - min(per_platform_volume, na.rm = TRUE)),
+
+    norm_per_platform_trains = (per_platform_trains - min(per_platform_trains, na.rm = TRUE)) /
+                               (max(per_platform_trains, na.rm = TRUE) - min(per_platform_trains, na.rm = TRUE)),
+
+    norm_per_train_volume = (per_train_volume - min(per_train_volume, na.rm = TRUE)) /
+                            (max(per_train_volume, na.rm = TRUE) - min(per_train_volume, na.rm = TRUE))
+  ) %>%
+  rowwise() %>%
+  mutate(
+    Crowding_Index = mean(c_across(starts_with("norm_")), na.rm = TRUE)
+  ) %>%
+  ungroup()
+
+# === 保存为 RDS ===
+saveRDS(df_combined, file = "data/page_2.4_explore_mode_precomputed.rds")
+
+df_combined
+
+df_combined %>% count(Station_Name) %>% arrange(desc(n))
+
+```
+
+```{r}
+df_combined_check <- readRDS("data/page_2.4_explore_mode_precomputed.rds")
+df_combined_check
+
+station_meta <- st_read("data/page_2.4_station_stats_with_station_type.geojson") %>%
+  mutate(
+    Longitude = st_coordinates(geometry)[,1],
+    Latitude = st_coordinates(geometry)[,2]
+  ) %>%
+  st_drop_geometry() %>%
+  select(Station_Name, N_Metro_Platform, N_Lines, Station_Type, Latitude, Longitude)
+
+station_meta
+```
+
+```{r}
+df_combined_check <- readRDS("data/page_2.4_explore_mode_precomputed.rds")
+
+print(c("All", unique(df_combined_check$Day_Type)))
+
+df_combined_check <- df_combined_check %>%
+  mutate(Day_Type = as.character(Day_Type))
+
+print(c("All", unique(df_combined_check$Day_Type)))
+```
+
+
+## Page 2.5
+### 模板1
+
+```{r}
+# Libraries
+library(igraph)
+library(networkD3)
+
+# create a dataset:
+data <- data_frame(
+  from=c("A", "A", "B", "D", "C", "D", "E", "B", "C", "D", "K", "A", "M"),
+  to=c("B", "E", "F", "A", "C", "A", "B", "Z", "A", "C", "A", "B", "K")
+)
+
+# Plot
+p <- simpleNetwork(data, height="100px", width="100px")
+
+p
+
+# save the widget
+# library(htmlwidgets)
+# saveWidget(p, file=paste0( getwd(), "/HtmlWidget/networkInteractive1.html"))
+```
+
+### 模板2
+
+```{r}
+# Libraries
+library(igraph)
+library(networkD3)
+
+# create a dataset:
+data <- data_frame(
+  from=c("A", "A", "B", "D", "C", "D", "E", "B", "C", "D", "K", "A", "M"),
+  to=c("B", "E", "F", "A", "C", "A", "B", "Z", "A", "C", "A", "B", "K")
+)
+
+# Plot
+p <- simpleNetwork(data, height="100px", width="100px",        
+        Source = 1,                 # column number of source
+        Target = 2,                 # column number of target
+        linkDistance = 10,          # distance between node. Increase this value to have more space between nodes
+        charge = -900,                # numeric value indicating either the strength of the node repulsion (negative value) or attraction (positive value)
+        fontSize = 14,               # size of the node names
+        fontFamily = "serif",       # font og node names
+        linkColour = "#666",        # colour of edges, MUST be a common colour for the whole graph
+        nodeColour = "#69b3a2",     # colour of nodes, MUST be a common colour for the whole graph
+        opacity = 0.9,              # opacity of nodes. 0=transparent. 1=no transparency
+        zoom = T                    # Can you zoom on the figure?
+        )
+
+p
+
+# save the widget
+# library(htmlwidgets)
+# saveWidget(p, file=paste0( getwd(), "/HtmlWidget/networkInteractive2.html"))
+```
+
+### 实现1
+
+```{r}
+library(dplyr)
+library(tidyr)
+library(networkD3)
+
+# 只保留有用字段
+edge_df <- Passenger_Dataset %>%
+  select(Train_Number, Stop_Sequence_Number, Station_Name) %>%
+  arrange(Train_Number, Stop_Sequence_Number) %>%
+  group_by(Train_Number) %>%
+  # 每列车：形成相邻两站的连接
+  mutate(Next_Station = lead(Station_Name)) %>%
+  ungroup() %>%
+  filter(!is.na(Next_Station), Station_Name != Next_Station) %>%
+  select(from = Station_Name, to = Next_Station)
+
+# 可选：去重（每对只保留一条连接）
+edge_unique <- edge_df %>%
+  distinct(from, to)
+
+# 可视化（先用简单图）
+p25 <- simpleNetwork(edge_unique, height = "500px", width = "100%", fontSize = 12, linkDistance = 30)
+
+# save the widget
+library(htmlwidgets)
+saveWidget(p25, file="HtmlWidget/networkInteractive2.html")
+```
+
+```{r}
+edge_unique
+edge_unique %>% filter(from == "Southern Cross") 
+edge_unique %>% filter(from == "Richmond") 
+```
+
+### 实现2
+
+```{r}
+library(dplyr)
+library(networkD3)
+
+# 过滤掉不包含 Stop_Sequence_Number 的记录（确保顺序正确）
+edge_cleaned <- Passenger_Dataset %>%
+  filter(!is.na(Stop_Sequence_Number)) %>%
+  select(Line_Name, Station_Name, Stop_Sequence_Number) %>%
+  distinct() %>%
+  arrange(Line_Name, Stop_Sequence_Number) %>%
+  group_by(Line_Name) %>%
+  mutate(Next_Station = lead(Station_Name)) %>%
+  ungroup() %>%
+  filter(!is.na(Next_Station), Station_Name != Next_Station) %>%
+  select(from = Station_Name, to = Next_Station) %>%
+  distinct()
+
+# 检查总边数
+nrow(edge_cleaned)
+
+# 可视化（先用简单图）
+p25 <- simpleNetwork(edge_cleaned, height = "500px", width = "100%", fontSize = 12, linkDistance = 30)
+
+# save the widget
+library(htmlwidgets)
+saveWidget(p25, file="HtmlWidget/networkInteractive2.html")
+```
+
+```{r}
+edge_cleaned
+edge_unique %>% filter(from == "Southern Cross") 
+edge_unique %>% filter(from == "Richmond") 
+```
+
+### 实现3
+
+```{r}
+library(dplyr)
+
+# 第一步：构建边表
+edge_df <- Passenger_Dataset %>%
+  select(Train_Number, Stop_Sequence_Number, Station_Name) %>%
+  arrange(Train_Number, Stop_Sequence_Number) %>%
+  group_by(Train_Number) %>%
+  mutate(Next_Station = lead(Station_Name)) %>%
+  ungroup() %>%
+  filter(!is.na(Next_Station), Station_Name != Next_Station) %>%
+  select(from = Station_Name, to = Next_Station)
+
+# 第二步：计算每条边出现的频次
+edge_freq <- edge_df %>%
+  count(from, to, name = "freq")
+
+# 第三步：设定筛选阈值（可调）-- 例如均值
+threshold <- mean(edge_freq$freq)
+
+# 第四步：保留“频率高于均值”的边
+filtered_edges <- edge_freq %>%
+  filter(freq >= threshold)
+
+# 第五步：可视化
+library(networkD3)
+
+p25 <- simpleNetwork(filtered_edges %>% select(from, to),
+              height = "600px",
+              width = "100%",
+              fontSize = 12,
+              linkDistance = 40)
+
+# save the widget
+library(htmlwidgets)
+saveWidget(p25, file="HtmlWidget/networkInteractive2.html")
+```
+
+```{r}
+edge_cleaned
+edge_unique %>% filter(from == "Southern Cross") 
+edge_unique %>% filter(from == "Richmond") 
+```
+
+### 实现4
+
+版本1：
+本图中所定义的“相邻站点”基于列车实际的停靠顺序：当两个车站在同一列车的运行序列中连续出现时，即视为一条边。进一步地，为排除异常线路，仅保留那些其出现频率超过该站点所有相邻边平均频率三倍以上的边。
+
+这种方式兼顾了物理相邻（如两站之间轨道直接连接）和运营相邻（如某些列车直达而跳过中间站的运行关系），较为准确地反映了真实的网络结构。
+
+版本2：
+“相邻关系”基于列车停靠顺序，并保留高频出现的边。该定义兼顾了物理相邻与跳停直达的运营连接，减少异常线路的干扰，突出主要路径结构。
+
+```{r}
+library(dplyr)
+
+# Step 1: 构建边表
+edge_df <- Passenger_Dataset %>%
+  select(Train_Number, Stop_Sequence_Number, Station_Name) %>%
+  arrange(Train_Number, Stop_Sequence_Number) %>%
+  group_by(Train_Number) %>%
+  mutate(Next_Station = lead(Station_Name)) %>%
+  ungroup() %>%
+  filter(!is.na(Next_Station), Station_Name != Next_Station) %>%
+  select(from = Station_Name, to = Next_Station)
+
+# Step 2: 统计每条边的出现次数
+edge_freq <- edge_df %>%
+  count(from, to, name = "freq")
+
+# Step 3: 为每个 from 单独计算边频均值并筛选
+threshold_ratio <- 3
+
+filtered_edges <- edge_freq %>%
+  group_by(from) %>%
+  mutate(mean_freq = mean(freq)) %>%
+  ungroup() %>%
+  filter(freq > mean_freq * threshold_ratio)
+```
+
+```{r}
+# Step 4: 可视化
+library(networkD3)
+
+p251 <- simpleNetwork(filtered_edges %>% select(from, to),
+              height = "600px",
+              width = "100%",
+              fontSize = 12,
+              linkDistance = 30,
+              opacity = 0.9,
+              zoom = T )
+
+# save the widget
+library(htmlwidgets)
+saveWidget(p251, file="HtmlWidget/p251.html")
+```
+
+```{r}
+filtered_edges
+filtered_edges %>% filter(from == "Southern Cross") 
+filtered_edges %>% filter(from == "Richmond") 
+filtered_edges %>% filter(from == "Flinders Street") 
+filtered_edges %>% filter(from == "South Yarra")
+```
+
+###更好看1
+
+```{r}
+library(dplyr)
+library(networkD3)
+
+# 构建 nodes 和 links
+nodes <- data.frame(name = unique(c(filtered_edges$from, filtered_edges$to))) %>%
+  mutate(group = 1)  # dummy 分组
+nodes$id <- 0:(nrow(nodes) - 1)
+
+links <- filtered_edges %>%
+  left_join(nodes, by = c("from" = "name")) %>%
+  rename(source = id) %>%
+  left_join(nodes, by = c("to" = "name")) %>%
+  rename(target = id) %>%
+  select(source, target, value = freq)
+
+# 加入缩放后的边宽值
+links <- links %>%
+  mutate(scaled_value = sqrt(value))  # 或 log(value + 1)，根据需要选一种
+
+library(igraph)
+
+g <- graph_from_data_frame(filtered_edges, directed = FALSE)
+degree_df <- data.frame(name = V(g)$name, degree = degree(g))
+
+# 合并进 nodes
+nodes <- nodes %>%
+  left_join(degree_df, by = "name") %>%
+  mutate(group = cut(degree, breaks = 4, labels = FALSE))  # 分组用于颜色
+
+# 绘图
+p252 <- forceNetwork(
+  Links = links,
+  Nodes = nodes,
+  Source = "source",
+  Target = "target",
+  NodeID = "name",
+  Group = "group",            # 根据 degree 分组着色
+  Value = "scaled_value",     # 缩放后的边宽
+  Nodesize = "degree",        # 根据 degree 设置大小（需额外 JS）
+  fontSize = 30,
+  linkDistance = JS("function(d) { return 80 / d.value; }"),  # 控制节点间距
+  charge = -200,
+  opacity = 0.9,
+  legend = TRUE,
+  zoom = TRUE
+)
+
+# 保存
+library(htmlwidgets)
+saveWidget(p252, file = "HtmlWidget/p252.html")
+
+```
+
+###更好看2
+
+```{r}
+library(dplyr)
+library(igraph)
+library(networkD3)
+library(viridisLite)
+
+# 构建 nodes 和 links
+nodes <- data.frame(name = unique(c(filtered_edges$from, filtered_edges$to))) %>%
+  mutate(group = 1)
+nodes$id <- 0:(nrow(nodes) - 1)
+
+# 边表
+links <- filtered_edges %>%
+  left_join(nodes, by = c("from" = "name")) %>%
+  rename(source = id) %>%
+  left_join(nodes, by = c("to" = "name")) %>%
+  rename(target = id) %>%
+  select(source, target, value = freq) %>%
+  mutate(scaled_value = sqrt(value))
+
+library(igraph)
+
+g <- graph_from_data_frame(filtered_edges, directed = FALSE)
+degree_df <- data.frame(name = V(g)$name, degree = degree(g))
+
+# 合并进 nodes
+nodes <- nodes %>%
+  left_join(degree_df, by = "name") %>%
+  mutate(group = cut(degree, breaks = 4, labels = FALSE))  # 分组用于颜色
+
+
+# 然后在 forceNetwork 里这样写：
+p252 <- forceNetwork(
+  Links = links,
+  Nodes = nodes,
+  Source = "source",
+  Target = "target",
+  NodeID = "tooltip",     # 👈 使用 tooltip 内容作为显示名称 & hover 提示
+  Group = "group",
+  Value = "scaled_value",
+  Nodesize = "degree",
+  fontSize = 20,
+  zoom = TRUE,
+  opacity = 0.9,
+  charge = -200,
+  linkDistance = JS("function(d) { return 80 / d.value; }"),
+  colourScale = JS(color_map),
+  opacityNoHover = 0.2
+)
+
+# # 绘图
+# p252 <- forceNetwork(
+#   Links = links,
+#   Nodes = nodes,
+#   Source = "source",
+#   Target = "target",
+#   NodeID = "name",
+#   Group = "group",
+#   Value = "scaled_value",
+#   Nodesize = "degree",
+#   fontSize = 20,  # 调大字体
+#   zoom = TRUE,
+#   opacity = 0.9,
+#   charge = -200,
+#   linkDistance = JS("function(d) { return 80 / d.value; }"),
+#   colourScale = JS(color_map),
+#   opacityNoHover = 0.2,
+#   tooltip = "tooltip"
+# )
+
+# 保存
+library(htmlwidgets)
+saveWidget(p252, file = "HtmlWidget/p252_enhanced.html")
+
+```
+
+
+### 更好看3（终版）
+
+版本1：
+本图中所定义的“相邻站点”基于列车实际的停靠顺序：当两个车站在同一列车的运行序列中连续出现时，即视为一条边。进一步地，为排除异常线路，仅保留那些其出现频率超过该站点所有相邻边平均频率三倍以上的边。
+
+这种方式兼顾了物理相邻（如两站之间轨道直接连接）和运营相邻（如某些列车直达而跳过中间站的运行关系），较为准确地反映了真实的网络结构。
+
+版本2：
+“相邻关系”基于列车停靠顺序，并保留高频出现的边。该定义兼顾了物理相邻与跳停直达的运营连接，减少异常线路的干扰，突出主要路径结构。
+
+```{r}
+library(dplyr)
+
+# Step 1: 构建边表
+edge_df <- Passenger_Dataset %>%
+  select(Train_Number, Stop_Sequence_Number, Station_Name) %>%
+  arrange(Train_Number, Stop_Sequence_Number) %>%
+  group_by(Train_Number) %>%
+  mutate(Next_Station = lead(Station_Name)) %>%
+  ungroup() %>%
+  filter(!is.na(Next_Station), Station_Name != Next_Station) %>%
+  select(from = Station_Name, to = Next_Station)
+
+# Step 2: 统计每条边的出现次数
+edge_freq <- edge_df %>%
+  count(from, to, name = "freq")
+
+# Step 3: 为每个 from 单独计算边频均值并筛选
+threshold_ratio <- 2.5
+
+filtered_edges <- edge_freq %>%
+  group_by(from) %>%
+  mutate(mean_freq = mean(freq)) %>%
+  ungroup() %>%
+  filter(freq > mean_freq * threshold_ratio)
+
+write_csv(filtered_edges, "data/page_2.5_filtered_edges.csv")
+filtered_edges
+```
+
+```{r}
+library(dplyr)
+library(igraph)
+library(networkD3)
+library(viridisLite)
+library(htmlwidgets)
+
+# === Step 1: 构建节点和边 ===
+# 节点
+nodes <- data.frame(name = unique(c(filtered_edges$from, filtered_edges$to))) %>%
+  mutate(id = 0:(n() - 1))  # 为每个节点分配唯一ID
+
+# 边 + 频率
+links <- filtered_edges %>%
+  left_join(nodes, by = c("from" = "name")) %>%
+  rename(source = id) %>%
+  left_join(nodes, by = c("to" = "name")) %>%
+  rename(target = id) %>%
+  select(source, target, freq) %>%
+  mutate(scaled_value = sqrt(freq))  # 控制边粗
+
+# === Step 2: 计算中心性并映射到节点属性 ===
+g <- graph_from_data_frame(filtered_edges, directed = FALSE)
+degree_df <- data.frame(name = V(g)$name, degree = degree(g))
+
+# 1. 使用标签分组 & 自定义图例内容
+nodes <- nodes %>%
+  left_join(degree_df, by = "name") %>%
+  mutate(
+    group = cut(
+      degree,
+      breaks = 5,
+      labels = c("Very Low", "Low", "Medium", "High", "Very High")
+    ),
+    name = paste0(name, " (deg=", degree, ")")
+  )
+
+# === Step 3: 设置颜色映射（inferno）===
+# 2. 倒转颜色
+color_vector <- color_vector <- rev(inferno(10))[c(2, 4, 6, 8, 10)]
+color_map <- paste0("d3.scaleOrdinal().domain([", 
+                    paste0('"', levels(nodes$group), '"', collapse = ","), "])",
+                    ".range([\"", paste(color_vector, collapse = "\", \""), "\"])")
+
+# === Step 5: 绘图 ===
+p252 <- forceNetwork(
+  Links = links,
+  Nodes = nodes,
+  Source = "source",
+  Target = "target",
+  Value = "scaled_value",
+  NodeID = "name",
+  Nodesize = "degree",
+  Group = "group",
+  fontSize = 33,
+  fontFamily = "sans-serif",
+  zoom = TRUE,
+  opacity = 1,
+  opacityNoHover = 0.2,
+  linkDistance = JS("function(d) { return 60 / Math.sqrt(d.value); }"),
+  linkWidth = JS("function(d) { return Math.sqrt(d.value); }"),
+  radiusCalculation = JS("Math.sqrt(d.nodesize) + 8"),
+  colourScale = JS(color_map),
+  charge = -200,
+  legend = TRUE
+)
+
+# === Step 6: 保存 ===
+saveWidget(p252, file = "HtmlWidget/p252_enhanced_final.html")
+
+```
+
+####计算指标
+
+```{r}
+library(igraph)
+
+# 使用你已有的图对象 g
+
+# 1. Average Degree
+avg_degree <- mean(degree(g))
+
+# 2. Average Clustering Coefficient（global transitivity）
+avg_clustering <- transitivity(g, type = "average")
+
+# 3. Average Shortest Path Length（仅限于连通图）
+avg_path_length <- mean_distance(g, directed = FALSE, unconnected = TRUE)
+
+# 4. Diameter（最大最短路径）
+graph_diameter <- diameter(g, directed = FALSE, unconnected = TRUE)
+
+# 5. Betweenness Centrality（取前 5）
+btw <- betweenness(g, directed = FALSE)
+top5_btw <- sort(btw, decreasing = TRUE)[1:5]
+top5_btw_df <- data.frame(Station = names(top5_btw), Betweenness = top5_btw)
+
+cat("Network Structure Metrics:\n")
+cat("- Average Degree:", round(avg_degree, 2), "\n")
+cat("- Average Clustering Coefficient:", round(avg_clustering, 3), "\n")
+cat("- Average Shortest Path Length:", round(avg_path_length, 2), "\n")
+cat("- Diameter:", graph_diameter, "\n")
+cat("- Top 5 Stations by Betweenness Centrality:\n")
+top5_btw_df
+```
+
+
+####移除站点测试
+
+```{r}
+# 假设你想移除 "Flinders Street"
+removed_station <- "Flinders Street"
+
+# Step 1: 删除与该节点相关的边
+filtered_edges_removed <- filtered_edges %>%
+  filter(from != removed_station & to != removed_station)
+
+# Step 2: 重新构建节点表
+nodes_removed <- data.frame(name = unique(c(filtered_edges_removed$from, filtered_edges_removed$to))) %>%
+  mutate(id = 0:(n() - 1))
+
+# Step 3: 构建边表
+links_removed <- filtered_edges_removed %>%
+  left_join(nodes_removed, by = c("from" = "name")) %>%
+  rename(source = id) %>%
+  left_join(nodes_removed, by = c("to" = "name")) %>%
+  rename(target = id) %>%
+  select(source, target, freq) %>%
+  mutate(scaled_value = sqrt(freq))
+
+# Step 4: 节点 degree + 分组 + 标签
+g_removed <- igraph::graph_from_data_frame(filtered_edges_removed, directed = FALSE)
+degree_df_removed <- data.frame(name = igraph::V(g_removed)$name, degree = igraph::degree(g_removed))
+
+nodes_removed <- nodes_removed %>%
+  left_join(degree_df_removed, by = "name") %>%
+  mutate(
+    group = cut(
+      degree,
+      breaks = 5,
+      labels = c("Very Low", "Low", "Medium", "High", "Very High")
+    ),
+    name = paste0(name, " (deg=", degree, ")")
+  )
+
+# Step 5: 保持之前的颜色映射
+color_vector <- rev(inferno(10))[c(2, 4, 6, 8, 10)]
+color_map <- paste0("d3.scaleOrdinal().domain([", 
+                    paste0('"', levels(nodes_removed$group), '"', collapse = ","), "])",
+                    ".range([\"", paste(color_vector, collapse = "\", \""), "\"])")
+
+# Step 6: forceNetwork 可视化
+p_removed <- forceNetwork(
+  Links = links_removed,
+  Nodes = nodes_removed,
+  Source = "source",
+  Target = "target",
+  Value = "scaled_value",
+  NodeID = "name",
+  Nodesize = "degree",
+  Group = "group",
+  fontSize = 33,
+  fontFamily = "sans-serif",
+  zoom = TRUE,
+  opacity = 1,
+  opacityNoHover = 0.2,
+  linkDistance = JS("function(d) { return 60 / Math.sqrt(d.value); }"),
+  linkWidth = JS("function(d) { return Math.sqrt(d.value); }"),
+  radiusCalculation = JS("Math.sqrt(d.nodesize) + 8"),
+  colourScale = JS(color_map),
+  charge = -200,
+  legend = TRUE
+)
+
+# Step 7: 保存
+saveWidget(p_removed, file = "HtmlWidget/p252_removed_flinders.html")
+
+```
+
